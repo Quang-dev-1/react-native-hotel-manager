@@ -21,7 +21,6 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
 
   const handleLogin = () => {
-    // TODO: Add authentication logic
     router.replace('/(tabs)/shop');
   };
 
@@ -52,7 +51,6 @@ export default function LoginScreen() {
               <Text style={styles.subtitle}>Sign in to continue shopping</Text>
             </View>
 
-            {/* Form */}
             <View style={styles.form}>
               {/* Email */}
               <View style={styles.inputGroup}>
