@@ -1,6 +1,6 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { CartProvider } from '@/contexts/CartContext';
+import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 
 export default function TabsLayout() {
   return (
@@ -8,15 +8,16 @@ export default function TabsLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: '#9333ea',
+          tabBarActiveTintColor: '#1a1e66ff',
           tabBarInactiveTintColor: '#9ca3af',
           tabBarStyle: {
             backgroundColor: '#fff',
             borderTopWidth: 1,
-            borderTopColor: '#f3f4f6',
             paddingBottom: 8,
+            borderTopColor: '#f3f4f6',
             paddingTop: 8,
             height: 60,
+            marginBottom: 15,
           },
           tabBarLabelStyle: {
             fontSize: 12,

@@ -1,28 +1,27 @@
+import { useCart } from '@/contexts/CartContext';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
-  View,
+  Alert,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Image,
-  Alert,
-  StatusBar,
+  View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useCart } from '@/contexts/CartContext';
 
 export default function CartScreen() {
-  // ✅ Sử dụng CartContext
   const { cartItems, removeFromCart, updateQuantity } = useCart();
 
-  const handleRemoveItem = (id: number) => {
+  const handleRemoveItem = (id: number, size: string, color: string) => {
     Alert.alert('Remove Item', 'Are you sure you want to remove this item?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: () => removeFromCart(id),
+        onPress: () => removeFromCart(id, size, color),
       },
     ]);
   };
@@ -56,7 +55,7 @@ export default function CartScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Cart</Text>
@@ -66,34 +65,43 @@ export default function CartScreen() {
       {/* Cart Items */}
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {cartItems.map((item) => (
-          <View key={item.id} style={styles.cartItem}>
+          <View key={`${item.id}-${item.size}-${item.color}`} style={styles.cartItem}>
             <Image source={{ uri: item.image }} style={styles.itemImage} />
-            
+
             <View style={styles.itemDetails}>
               <Text style={styles.itemName} numberOfLines={2}>
                 {item.name}
               </Text>
-              <Text style={styles.itemSize}>Size: {item.size}</Text>
+              <View style={styles.itemAttributes}>
+                <View style={styles.attributeTag}>
+                  <Text style={styles.attributeLabel}>Size:</Text>
+                  <Text style={styles.attributeValue}>{item.size}</Text>
+                </View>
+                <View style={styles.attributeTag}>
+                  <Text style={styles.attributeLabel}>Color:</Text>
+                  <Text style={styles.attributeValue}>{item.color}</Text>
+                </View>
+              </View>
               <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
             </View>
 
             <View style={styles.itemActions}>
               <TouchableOpacity
                 style={styles.deleteButton}
-                onPress={() => handleRemoveItem(item.id)}>
+                onPress={() => handleRemoveItem(item.id, item.size, item.color)}>
                 <Ionicons name="trash-outline" size={20} color="#dc2626" />
               </TouchableOpacity>
 
               <View style={styles.quantityControl}>
                 <TouchableOpacity
                   style={styles.quantityButton}
-                  onPress={() => updateQuantity(item.id, -1)}>
+                  onPress={() => updateQuantity(item.id, item.size, item.color, -1)}>
                   <Ionicons name="remove" size={16} color="#6b7280" />
                 </TouchableOpacity>
                 <Text style={styles.quantity}>{item.quantity}</Text>
                 <TouchableOpacity
                   style={styles.quantityButton}
-                  onPress={() => updateQuantity(item.id, 1)}>
+                  onPress={() => updateQuantity(item.id, item.size, item.color, 1)}>
                   <Ionicons name="add" size={16} color="#6b7280" />
                 </TouchableOpacity>
               </View>
@@ -104,7 +112,7 @@ export default function CartScreen() {
         {/* Price Summary */}
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Order Summary</Text>
-          
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Subtotal</Text>
             <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
@@ -136,7 +144,7 @@ export default function CartScreen() {
           onPress={handleCheckout}
           activeOpacity={0.8}>
           <LinearGradient
-            colors={['#9333ea', '#ec4899']}
+            colors={['#1f2035ff', '#151165ff']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.checkoutGradient}>
@@ -203,17 +211,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#111',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  itemSize: {
-    fontSize: 12,
+  itemAttributes: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
+  attributeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  attributeLabel: {
+    fontSize: 11,
     color: '#6b7280',
-    marginBottom: 4,
+    fontWeight: '500',
+  },
+  attributeValue: {
+    fontSize: 11,
+    color: '#111',
+    fontWeight: '600',
   },
   itemPrice: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#9333ea',
+    color: '#1f2035ff',
   },
   itemActions: {
     justifyContent: 'space-between',
@@ -286,7 +313,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#9333ea',
+    color: '#1f2035ff',
   },
   footer: {
     backgroundColor: '#fff',

@@ -1,7 +1,7 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ProfileScreen() {
   const handleLogout = () => {
@@ -12,9 +12,12 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <LinearGradient
-          colors={['#9333ea', '#ec4899']}
+          colors={['#1f2035ff', '#151165ff']}
           style={styles.avatar}>
-          <Ionicons name="person" size={48} color="#fff" />
+          <Image
+            style={{ width: 145, height: 145 }}
+            source={require('../../assets/images/logo_shopp.png')}
+          />
         </LinearGradient>
         <Text style={styles.name}>Nguyễn Hữu Quang</Text>
         <Text style={styles.email}>nguyenhuuquang150805@gmail.com</Text>

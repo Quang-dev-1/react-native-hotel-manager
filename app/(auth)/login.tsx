@@ -1,18 +1,19 @@
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -40,11 +41,14 @@ export default function LoginScreen() {
             {/* Logo */}
             <View style={styles.logoContainer}>
               <LinearGradient
-                colors={['#9333ea', '#ec4899']}
+                colors={['#1f2035ff', '#151165ff']}
                 style={styles.logoGradient}>
-                <Ionicons name="bag-handle" size={32} color="#fff" />
+                  <Image
+                    style={{ width: 145, height: 145 }}
+                    source={require('../../assets/images/logo_shopp.png')}
+                  />
               </LinearGradient>
-              <Text style={styles.title}>Welcome Back</Text>
+              <Text style={styles.title}>Login</Text>
               <Text style={styles.subtitle}>Sign in to continue shopping</Text>
             </View>
 
@@ -86,7 +90,7 @@ export default function LoginScreen() {
                   <Ionicons
                     name={rememberMe ? 'checkbox' : 'square-outline'}
                     size={24}
-                    color="#9333ea"
+                    color="#151165ff"
                   />
                   <Text style={styles.checkboxLabel}>Remember me</Text>
                 </TouchableOpacity>
@@ -101,7 +105,7 @@ export default function LoginScreen() {
                 onPress={handleLogin}
                 activeOpacity={0.8}>
                 <LinearGradient
-                  colors={['#9333ea', '#ec4899']}
+                  colors={['#1f2035ff', '#151165ff']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.button}>
@@ -154,12 +158,15 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logoGradient: {
-    width: 80,
-    height: 80,
+    width: 140,
+    height: 140,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    // image
+    overflow: 'hidden',
+
   },
   title: {
     fontSize: 28,
@@ -209,7 +216,7 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#9333ea',
+    color: '#151165ff',
   },
   buttonContainer: {
     borderRadius: 12,

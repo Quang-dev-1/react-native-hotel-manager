@@ -1,19 +1,20 @@
+import ProductDetailModal from '@/components/ProductDetailModal';
+import { useCart } from '@/contexts/CartContext';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  View,
+  Alert,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Image,
-  StatusBar,
-  Alert,
+  View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useCart } from '@/contexts/CartContext';
 
 const products = [
   {
@@ -23,6 +24,9 @@ const products = [
     image: 'https://images.unsplash.com/photo-1693443688057-85f57b872a3c?w=400',
     category: 'Tops',
     rating: 4.5,
+    description: 'A timeless classic white t-shirt made from premium cotton. Perfect for any casual occasion.',
+    sizes: ['S', 'M', 'L', 'XL'],
+    colors: ['White', 'Black', 'Gray'],
   },
   {
     id: 2,
@@ -31,6 +35,9 @@ const products = [
     image: 'https://images.unsplash.com/photo-1706765779494-2705542ebe74?w=400',
     category: 'Jackets',
     rating: 4.8,
+    description: 'Stylish denim jacket with a modern fit. Great for layering in any season.',
+    sizes: ['S', 'M', 'L', 'XL'],
+    colors: ['Blue', 'Black'],
   },
   {
     id: 3,
@@ -39,6 +46,9 @@ const products = [
     image: 'https://images.unsplash.com/photo-1635447272615-a414b7ea1df4?w=400',
     category: 'Dresses',
     rating: 4.7,
+    description: 'Light and breezy summer dress perfect for warm weather. Comfortable and elegant.',
+    sizes: ['XS', 'S', 'M', 'L'],
+    colors: ['White', 'Pink', 'Yellow'],
   },
   {
     id: 4,
@@ -47,6 +57,9 @@ const products = [
     image: 'https://images.unsplash.com/photo-1656944227480-98180d2a5155?w=400',
     category: 'Shoes',
     rating: 4.9,
+    description: 'High-quality sneakers with superior comfort and style. Perfect for everyday wear.',
+    sizes: ['38', '39', '40', '41', '42'],
+    colors: ['White', 'Black', 'Navy'],
   },
   {
     id: 5,
@@ -55,6 +68,9 @@ const products = [
     image: 'https://images.unsplash.com/photo-1708317031389-1afe5ccc6f96?w=400',
     category: 'Sets',
     rating: 4.6,
+    description: 'Complete casual outfit set. Coordinated pieces for effortless style.',
+    sizes: ['S', 'M', 'L', 'XL'],
+    colors: ['Beige', 'Gray', 'Navy'],
   },
   {
     id: 6,
@@ -63,6 +79,9 @@ const products = [
     image: 'https://images.unsplash.com/photo-1694452243646-959eef618dad?w=400',
     category: 'Premium',
     rating: 5.0,
+    description: 'Premium fashion collection featuring the latest trends and highest quality materials.',
+    sizes: ['S', 'M', 'L', 'XL'],
+    colors: ['Multi'],
   },
 ];
 
@@ -72,8 +91,8 @@ export default function ShopScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [favorites, setFavorites] = useState<number[]>([]);
-  
-  // ✅ Sử dụng CartContext
+  const [selectedProduct, setSelectedProduct] = useState<typeof products[0] | null>(null);
+
   const { addToCart, cartCount } = useCart();
 
   const toggleFavorite = (id: number) => {
@@ -82,26 +101,35 @@ export default function ShopScreen() {
     );
   };
 
-  const handleAddToCart = (product: typeof products[0]) => {
+  const handleAddToCart = (product: typeof products[0], size: string, color: string) => {
     addToCart({
       id: product.id,
       name: product.name,
       price: product.price,
       image: product.image,
       category: product.category,
+      size: size,
+      color: color,
     });
-    
+
     Alert.alert(
       'Added to Cart',
-      `${product.name} has been added to your cart`,
+      `${product.name} (${size}, ${color}) has been added to your cart`,
       [
         { text: 'Continue Shopping', style: 'cancel' },
-        { 
-          text: 'View Cart', 
+        {
+          text: 'View Cart',
           onPress: () => router.push('/(tabs)/cart')
         }
       ]
     );
+  };
+
+  const handleAddToCartFromDetail = (size: string, color: string) => {
+    if (selectedProduct) {
+      handleAddToCart(selectedProduct, size, color);
+      setSelectedProduct(null);
+    }
   };
 
   const goToCart = () => {
@@ -117,24 +145,26 @@ export default function ShopScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.logoContainer}>
             <LinearGradient
-              colors={['#9333ea', '#ec4899']}
+              colors={['#1f2035ff', '#151165ff']}
               style={styles.logoGradient}>
-              <Ionicons name="bag-handle" size={24} color="#fff" />
+              <Image
+                style={{ width: 50, height: 50 }}
+                source={require('../../assets/images/logo_shopp.png')}
+              />
             </LinearGradient>
-            <Text style={styles.logoText}>StyleHub</Text>
+            <Text style={styles.logoText}>QApparel</Text>
           </View>
-          
+
           {/* Cart Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.cartContainer}
-            onPress={goToCart}
-            activeOpacity={0.7}>
+            onPress={goToCart}>
             <Ionicons name="bag-handle-outline" size={24} color="#111" />
             {cartCount > 0 && (
               <View style={styles.badge}>
@@ -146,7 +176,7 @@ export default function ShopScreen() {
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#9ca3af" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color="#9ca3af" />
           <TextInput
             style={styles.searchInput}
             placeholder="Search for clothes..."
@@ -161,7 +191,6 @@ export default function ShopScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.categoriesScroll}
           contentContainerStyle={styles.categoriesContent}>
           {categories.map((category) => (
             <TouchableOpacity
@@ -185,7 +214,6 @@ export default function ShopScreen() {
 
       {/* Products Grid */}
       <ScrollView
-        style={styles.productsContainer}
         contentContainerStyle={styles.productsContent}
         showsVerticalScrollIndicator={false}>
         <View style={styles.sectionHeader}>
@@ -197,7 +225,11 @@ export default function ShopScreen() {
 
         <View style={styles.productsGrid}>
           {filteredProducts.map((product) => (
-            <View key={product.id} style={styles.productCard}>
+            <TouchableOpacity
+              key={product.id}
+              style={styles.productCard}
+              onPress={() => setSelectedProduct(product)}
+              activeOpacity={0.9}>
               <View style={styles.imageContainer}>
                 <Image
                   source={{ uri: product.image }}
@@ -205,12 +237,15 @@ export default function ShopScreen() {
                   resizeMode="cover"
                 />
                 <TouchableOpacity
-                  onPress={() => toggleFavorite(product.id)}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    toggleFavorite(product.id);
+                  }}
                   style={styles.favoriteButton}>
                   <Ionicons
                     name={favorites.includes(product.id) ? 'heart' : 'heart-outline'}
                     size={20}
-                    color={favorites.includes(product.id) ? '#ec4899' : '#6b7280'}
+                    color={favorites.includes(product.id) ? '#c42228ff' : '#6b7280'}
                   />
                 </TouchableOpacity>
                 <View style={styles.categoryBadge}>
@@ -228,24 +263,34 @@ export default function ShopScreen() {
                 </View>
                 <View style={styles.productFooter}>
                   <Text style={styles.price}>${product.price}</Text>
-                  <TouchableOpacity 
-                    onPress={() => handleAddToCart(product)} 
-                    style={styles.addButton}
-                    activeOpacity={0.8}>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setSelectedProduct(product);
+                    }}
+                    style={styles.addButton}>
                     <LinearGradient
-                      colors={['#9333ea', '#ec4899']}
+                      colors={['#1f2035ff', '#151165ff']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.addButtonGradient}>
-                      <Text style={styles.addButtonText}>Add</Text>
+                      <Text style={styles.addButtonText}>Select</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
+
+      {/* Product Detail Modal */}
+      <ProductDetailModal
+        visible={selectedProduct !== null}
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={handleAddToCartFromDetail}
+      />
     </View>
   );
 }
@@ -258,8 +303,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
     paddingTop: 60,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
@@ -275,8 +319,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoGradient: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -284,7 +328,6 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111',
   },
   cartContainer: {
     position: 'relative',
@@ -294,13 +337,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: 0,
-    backgroundColor: '#ec4899',
+    backgroundColor: '#151165ff',
     borderRadius: 10,
     minWidth: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
   },
   badgeText: {
     color: '#fff',
@@ -312,20 +354,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f9fafb',
     borderRadius: 24,
-    paddingHorizontal: 16,
+    padding: 16,
     height: 48,
     marginBottom: 16,
-  },
-  searchIcon: {
-    marginRight: 8,
+    gap: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#111',
-  },
-  categoriesScroll: {
-    marginHorizontal: -16,
   },
   categoriesContent: {
     paddingHorizontal: 16,
@@ -339,18 +375,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   categoryChipActive: {
-    backgroundColor: '#9333ea',
+    backgroundColor: '#1f2035ff',
   },
   categoryText: {
     fontSize: 14,
-    fontWeight: '500',
     color: '#6b7280',
   },
   categoryTextActive: {
     color: '#fff',
-  },
-  productsContainer: {
-    flex: 1,
   },
   productsContent: {
     padding: 16,
@@ -358,18 +390,16 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111',
   },
   viewAllText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#9333ea',
+    color: '#1f2035ff',
   },
   productsGrid: {
     flexDirection: 'row',
@@ -384,7 +414,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   imageContainer: {
-    position: 'relative',
     aspectRatio: 1,
   },
   productImage: {
@@ -398,17 +427,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   categoryBadge: {
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: '#9333ea',
+    backgroundColor: '#130644ff',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -424,7 +448,6 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111',
     marginBottom: 4,
   },
   ratingContainer: {
@@ -445,7 +468,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#9333ea',
+    color: '#1f2035ff',
   },
   addButton: {
     borderRadius: 12,

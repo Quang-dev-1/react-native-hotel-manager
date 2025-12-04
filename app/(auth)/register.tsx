@@ -1,19 +1,20 @@
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
@@ -55,11 +56,14 @@ export default function RegisterScreen() {
             {/* Logo */}
             <View style={styles.logoContainer}>
               <LinearGradient
-                colors={['#9333ea', '#ec4899']}
+                colors={['#1f2035ff', '#151165ff']}
                 style={styles.logoGradient}>
-                <Ionicons name="bag-handle" size={32} color="#fff" />
+                  <Image
+                    style={{ width: 145, height: 145 }}
+                    source={require('../../assets/images/logo_shopp.png')}
+                                    />
               </LinearGradient>
-              <Text style={styles.title}>Create Account</Text>
+              <Text style={styles.title}>Register</Text>
               <Text style={styles.subtitle}>Join us to start shopping</Text>
             </View>
 
@@ -120,7 +124,7 @@ export default function RegisterScreen() {
                 <Ionicons
                   name={agreeTerms ? 'checkbox' : 'square-outline'}
                   size={24}
-                  color="#9333ea"
+                  color="#1f2035ff"
                 />
                 <Text style={styles.termsText}>
                   I agree to the Terms of Service and Privacy Policy
@@ -132,7 +136,7 @@ export default function RegisterScreen() {
                 onPress={handleRegister}
                 activeOpacity={0.8}>
                 <LinearGradient
-                  colors={['#9333ea', '#ec4899']}
+                  colors={['#1f2035ff', '#151165ff']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.button}>
@@ -184,12 +188,13 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logoGradient: {
-    width: 80,
-    height: 80,
+    width: 140,
+    height: 140,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    overflow: 'hidden',
   },
   title: {
     fontSize: 28,
@@ -236,7 +241,7 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#9333ea',
+    color: '#1f2035ff',
   },
   buttonContainer: {
     borderRadius: 12,
