@@ -1,5 +1,6 @@
 import ProductDetailModal from '@/components/ProductDetailModal';
 import { useCart } from '@/contexts/CartContext';
+import { useFavorites } from '@/contexts/FavoritesContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -90,15 +91,13 @@ const categories = ['All', 'Tops', 'Jackets', 'Dresses', 'Shoes', 'Sets'];
 export default function ShopScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [favorites, setFavorites] = useState<number[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<typeof products[0] | null>(null);
 
   const { addToCart, cartCount } = useCart();
+  const { toggleFavorite, isFavorite } = useFavorites();
 
-  const toggleFavorite = (id: number) => {
-    setFavorites((prev) =>
-      prev.includes(id) ? prev.filter((fav) => fav !== id) : [...prev, id]
-    );
+  const handleToggleFavorite = (product: typeof products[0]) => {
+    toggleFavorite(product);
   };
 
   const handleAddToCart = (product: typeof products[0], size: string, color: string) => {
@@ -239,13 +238,13 @@ export default function ShopScreen() {
                 <TouchableOpacity
                   onPress={(e) => {
                     e.stopPropagation();
-                    toggleFavorite(product.id);
+                    handleToggleFavorite(product);
                   }}
                   style={styles.favoriteButton}>
                   <Ionicons
-                    name={favorites.includes(product.id) ? 'heart' : 'heart-outline'}
+                    name={isFavorite(product.id) ? 'heart' : 'heart-outline'}
                     size={20}
-                    color={favorites.includes(product.id) ? '#c42228ff' : '#6b7280'}
+                    color={isFavorite(product.id) ? '#c42228ff' : '#6b7280'}
                   />
                 </TouchableOpacity>
                 <View style={styles.categoryBadge}>

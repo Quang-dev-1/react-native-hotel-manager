@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { Platform } from 'react-native';
+
 
 export default function AuthLayout() {
   return (
@@ -10,7 +10,7 @@ export default function AuthLayout() {
         animation: 'fade',
         presentation: 'card',
       }}>
-      <Stack.Screen 
+      <Stack.Screen
         name="login"
         options={{
           headerShown: false,
@@ -18,8 +18,16 @@ export default function AuthLayout() {
           headerBackVisible: false,
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="register"
+        options={{
+          headerShown: false,
+          title: '',
+          headerBackVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="forgot-password"
         options={{
           headerShown: false,
           title: '',

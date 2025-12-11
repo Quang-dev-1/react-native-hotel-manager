@@ -60,7 +60,6 @@ export default function ProfileScreen() {
   );
 }
 
-// ✅ FIXED: Đổi tên từ 'profileStyles' thành 'styles'
 const styles = StyleSheet.create({
   container: {
     flex: 1,
