@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import {
     Animated,
-    Dimensions,
     Image,
     StatusBar,
     StyleSheet,
@@ -13,15 +12,12 @@ import {
     View,
 } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
-
 export default function WelcomeScreen() {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.3)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
 
     useEffect(() => {
-        // Animation sequence
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
@@ -67,7 +63,7 @@ export default function WelcomeScreen() {
                         <View style={styles.logoWrapper}>
                             <Image
                                 style={styles.logo}
-                                source={require('../assets/images/logo_shopp.png')}
+                                source={require('../assets/images/HotelManager.png')}
                             />
                         </View>
                     </Animated.View>
@@ -81,12 +77,12 @@ export default function WelcomeScreen() {
                             },
                         ]}>
                         <Text style={styles.welcomeText}>Welcome to</Text>
-                        <Text style={styles.appName}>QApparel</Text>
+                        <Text style={styles.appName}>Hotel Manager</Text>
                         <Text style={styles.tagline}>
-                            Discover Your Perfect Style
+                            Quản lý khách sạn hiệu quả
                         </Text>
                         <Text style={styles.description}>
-                            Shop the latest fashion trends with exclusive deals and fast delivery
+                            Hệ thống quản lý khách sạn toàn diện với giao diện hiện đại
                         </Text>
                     </Animated.View>
 
@@ -100,16 +96,16 @@ export default function WelcomeScreen() {
                             },
                         ]}>
                         <View style={styles.feature}>
-                            <Ionicons name="flash" size={24} color="#fbbf24" />
-                            <Text style={styles.featureText}>Fast Delivery</Text>
+                            <Ionicons name="bed" size={24} color="#fbbf24" />
+                            <Text style={styles.featureText}>Quản lý phòng</Text>
                         </View>
                         <View style={styles.feature}>
-                            <Ionicons name="shield-checkmark" size={24} color="#10b981" />
-                            <Text style={styles.featureText}>Secure Payment</Text>
+                            <Ionicons name="calendar" size={24} color="#10b981" />
+                            <Text style={styles.featureText}>Đặt phòng dễ dàng</Text>
                         </View>
                         <View style={styles.feature}>
-                            <Ionicons name="star" size={24} color="#f59e0b" />
-                            <Text style={styles.featureText}>Premium Quality</Text>
+                            <Ionicons name="bar-chart" size={24} color="#f59e0b" />
+                            <Text style={styles.featureText}>Báo cáo chi tiết</Text>
                         </View>
                     </Animated.View>
 
@@ -126,19 +122,19 @@ export default function WelcomeScreen() {
                             onPress={handleGetStarted}
                             activeOpacity={0.8}>
                             <LinearGradient
-                                colors={['#f3e7f5', '#fce7f3']}
+                                colors={['#4a90e2', '#357abd']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.buttonGradient}>
-                                <Text style={styles.buttonText}>Get Started</Text>
-                                <Ionicons name="arrow-forward" size={20} color="#1f2035ff" />
+                                <Text style={styles.buttonText}>Bắt đầu</Text>
+                                <Ionicons name="arrow-forward" size={20} color="#fff" />
                             </LinearGradient>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            onPress={() => router.replace('/(tabs)/shop')}
+                            onPress={() => router.replace('/(drawer)/dashboard')}
                             style={styles.skipButton}>
-                            <Text style={styles.skipText}>Skip for now</Text>
+                            <Text style={styles.skipText}>Bỏ qua</Text>
                         </TouchableOpacity>
                     </Animated.View>
                 </View>
@@ -161,7 +157,7 @@ const styles = StyleSheet.create({
         width: 300,
         height: 300,
         borderRadius: 150,
-        backgroundColor: 'rgba(243, 231, 245, 0.1)',
+        backgroundColor: 'rgba(74, 144, 226, 0.1)',
     },
     circleBottom: {
         position: 'absolute',
@@ -170,7 +166,7 @@ const styles = StyleSheet.create({
         width: 400,
         height: 400,
         borderRadius: 200,
-        backgroundColor: 'rgba(252, 231, 243, 0.1)',
+        backgroundColor: 'rgba(53, 122, 189, 0.1)',
     },
     content: {
         flex: 1,
@@ -195,6 +191,7 @@ const styles = StyleSheet.create({
     logo: {
         width: 150,
         height: 150,
+        borderRadius: 20,
     },
     textContainer: {
         alignItems: 'center',
@@ -251,7 +248,7 @@ const styles = StyleSheet.create({
         width: '100%',
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#f3e7f5',
+        shadowColor: '#4a90e2',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -267,7 +264,7 @@ const styles = StyleSheet.create({
     buttonText: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1f2035ff',
+        color: '#fff',
     },
     skipButton: {
         paddingVertical: 12,

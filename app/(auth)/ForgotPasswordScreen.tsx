@@ -150,12 +150,10 @@ export default function ForgotPasswordScreen() {
 
                     {/* Logo & Title */}
                     <View style={styles.header}>
-                        <LinearGradient colors={['#1f2035ff', '#151165ff']} style={styles.logo}>
-                            <Image
-                                style={styles.logoImg}
-                                source={require('../../assets/images/logo_shopp.png')}
-                            />
-                        </LinearGradient>
+                        <Image
+                            style={styles.logo}
+                            source={require('../../assets/images/HotelManager.png')}
+                        />
                         <Text style={styles.title}>{getTitle()}</Text>
                         <Text style={styles.subtitle}>{getSubtitle()}</Text>
                     </View>
@@ -374,14 +372,8 @@ const styles = StyleSheet.create({
     logo: {
         width: 90,
         height: 90,
-        borderRadius: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
         marginBottom: 20,
-    },
-    logoImg: {
-        width: 60,
-        height: 60,
+        borderRadius: 15,
     },
     title: {
         fontSize: 32,

@@ -53,13 +53,13 @@ export default function Index() {
           <View style={styles.logoWrapper}>
             <Image
               style={styles.logo}
-              source={require('../assets/images/logo_shopp.png')}
+              source={require('../assets/images/HotelManager.png')}
             />
 
           </View>
           <View style={styles.vWelcomme} >
             <Animated.Text style={[styles.tWelcomme, { opacity: fadeAnim }]}>
-              Welcome to Shopp!
+              HotelManager welcome!
             </Animated.Text>
           </View>
         </Animated.View>
@@ -94,6 +94,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 160,
     height: 160,
+    borderRadius: 20,
   },
   vWelcomme: {
     marginTop: 20,

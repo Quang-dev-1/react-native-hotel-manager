@@ -1,13 +1,14 @@
+import { BookingProvider } from '@/contexts/BookingContext';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import 'react-native-gesture-handler';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-  });
+  const [fontsLoaded] = useFonts({});
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -20,26 +21,18 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: '#fff' },
-        animation: 'fade',
-      }}>
-      <Stack.Screen
-        name="(auth)"
-        options={{
+    <BookingProvider>
+      <Stack
+        screenOptions={{
           headerShown: false,
-          title: '',
-        }}
-      />
-      <Stack.Screen
-        name="(tabs)"
-        options={{
-          headerShown: false,
-          title: '',
-        }}
-      />
-    </Stack>
+          contentStyle: { backgroundColor: '#fff' },
+          animation: 'fade',
+        }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="WelcomeScreen" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(drawer)" />
+      </Stack>
+    </BookingProvider>
   );
 }
