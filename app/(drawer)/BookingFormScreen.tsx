@@ -1,9 +1,11 @@
-import { useBooking } from '@/contexts/BookingContext';
+import bookingService from '@/services/bookingService';
+import { Room } from '@/services/roomService';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Modal,
     ScrollView,
@@ -14,7 +16,6 @@ import {
     View,
 } from 'react-native';
 
-// Simple Calendar Component
 const CalendarPicker = ({
     visible,
     onClose,
@@ -86,12 +87,10 @@ const CalendarPicker = ({
         const firstDay = getFirstDayOfMonth(currentMonth, currentYear);
         const days = [];
 
-        // Add empty cells for days before the first day of month
         for (let i = 0; i < firstDay; i++) {
             days.push(<View key={`empty-${i}`} style={styles.calendarDay} />);
         }
 
-        // Add days of the month
         for (let day = 1; day <= daysInMonth; day++) {
             const disabled = isDateDisabled(day);
             const today = isToday(day);
@@ -173,10 +172,8 @@ const CalendarPicker = ({
 export default function BookingFormScreen() {
     const navigation = useNavigation();
     const route = useRoute();
-    const { addBooking } = useBooking();
-    const { room } = route.params as any;
+    const { room } = route.params as { room: Room };
 
-    // Form state
     const [customerName, setCustomerName] = useState('');
     const [phone, setPhone] = useState('');
     const [checkInDate, setCheckInDate] = useState(new Date());
@@ -185,8 +182,8 @@ export default function BookingFormScreen() {
     const [showCheckOutPicker, setShowCheckOutPicker] = useState(false);
     const [deposit, setDeposit] = useState('');
     const [notes, setNotes] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    // Validation states
     const [errors, setErrors] = useState({
         customerName: '',
         phone: '',
@@ -239,7 +236,14 @@ export default function BookingFormScreen() {
         setErrors(prev => ({ ...prev, deposit: validateDeposit(text) }));
     };
 
-    const formatDate = (date: Date) => {
+    const formatDateForAPI = (date: Date) => {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const formatDateForDisplay = (date: Date) => {
         const day = date.getDate().toString().padStart(2, '0');
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
         const year = date.getFullYear();
@@ -248,7 +252,6 @@ export default function BookingFormScreen() {
 
     const handleCheckInDateSelect = (date: Date) => {
         setCheckInDate(date);
-        // Auto adjust checkout date if it's before new check-in date
         if (date >= checkOutDate) {
             setCheckOutDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
         }
@@ -267,8 +270,7 @@ export default function BookingFormScreen() {
         return room.price * calculateNights();
     };
 
-    const handleSubmitBooking = () => {
-        // Validate all fields
+    const handleSubmitBooking = async () => {
         const nameError = validateCustomerName(customerName);
         const phoneError = validatePhone(phone);
         const depositError = validateDeposit(deposit);
@@ -279,7 +281,6 @@ export default function BookingFormScreen() {
             deposit: depositError,
         });
 
-        // Check if any errors exist
         if (nameError || phoneError || depositError) {
             Alert.alert('Lỗi', 'Vui lòng kiểm tra lại thông tin đã nhập');
             return;
@@ -291,27 +292,38 @@ export default function BookingFormScreen() {
             return;
         }
 
-        const totalAmount = calculateTotal();
         const depositAmount = deposit ? parseFloat(deposit) : 0;
 
-        // Create booking
-        const booking = {
-            roomNumber: room.roomNumber,
-            customerName: customerName.trim(),
-            phone: phone.trim(),
-            checkIn: formatDate(checkInDate),
-            checkOut: formatDate(checkOutDate),
-            nights,
-            totalAmount,
-            deposit: depositAmount,
-            notes: notes.trim(),
-            status: 'active' as const,
-        };
+        try {
+            setLoading(true);
 
-        addBooking(booking);
-        Alert.alert('Thành công', `Đã đặt phòng ${room.roomNumber} thành công!`, [
-            { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
+            const bookingData = {
+                roomId: room.id!,
+                customerName: customerName.trim(),
+                phone: phone.trim(),
+                checkIn: formatDateForAPI(checkInDate),
+                checkOut: formatDateForAPI(checkOutDate),
+                deposit: depositAmount,
+                notes: notes.trim(),
+            };
+
+            await bookingService.createBooking(bookingData);
+
+            Alert.alert(
+                'Thành công',
+                `Đã đặt phòng ${room.roomNumber} thành công!`,
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.goBack()
+                    }
+                ]
+            );
+        } catch (error: any) {
+            Alert.alert('Lỗi', error.message || 'Không thể tạo đặt phòng');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -332,7 +344,7 @@ export default function BookingFormScreen() {
                 <View style={styles.roomBadge}>
                     <Ionicons name="bed" size={20} color="#fff" />
                     <Text style={styles.roomBadgeText}>
-                        Phòng {room.roomNumber} - {room.type}
+                        Phòng {room.roomNumber} - {room.roomTypeName}
                     </Text>
                 </View>
             </LinearGradient>
@@ -342,7 +354,6 @@ export default function BookingFormScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.formContent}>
 
-                {/* Customer Name */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>
                         Tên khách hàng <Text style={styles.required}>*</Text>
@@ -358,6 +369,7 @@ export default function BookingFormScreen() {
                             value={customerName}
                             onChangeText={handleCustomerNameChange}
                             placeholderTextColor="#94a3b8"
+                            editable={!loading}
                         />
                     </View>
                     {errors.customerName ? (
@@ -365,7 +377,6 @@ export default function BookingFormScreen() {
                     ) : null}
                 </View>
 
-                {/* Phone */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>
                         Số điện thoại <Text style={styles.required}>*</Text>
@@ -383,6 +394,7 @@ export default function BookingFormScreen() {
                             keyboardType="phone-pad"
                             maxLength={11}
                             placeholderTextColor="#94a3b8"
+                            editable={!loading}
                         />
                     </View>
                     {errors.phone ? (
@@ -390,35 +402,34 @@ export default function BookingFormScreen() {
                     ) : null}
                 </View>
 
-                {/* Check-in Date */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>
                         Ngày nhận phòng <Text style={styles.required}>*</Text>
                     </Text>
                     <TouchableOpacity
                         style={styles.dateButton}
-                        onPress={() => setShowCheckInPicker(true)}>
+                        onPress={() => setShowCheckInPicker(true)}
+                        disabled={loading}>
                         <Ionicons name="calendar-outline" size={20} color="#64748b" />
-                        <Text style={styles.dateText}>{formatDate(checkInDate)}</Text>
+                        <Text style={styles.dateText}>{formatDateForDisplay(checkInDate)}</Text>
                         <Ionicons name="chevron-down-outline" size={20} color="#64748b" />
                     </TouchableOpacity>
                 </View>
 
-                {/* Check-out Date */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>
                         Ngày trả phòng <Text style={styles.required}>*</Text>
                     </Text>
                     <TouchableOpacity
                         style={styles.dateButton}
-                        onPress={() => setShowCheckOutPicker(true)}>
+                        onPress={() => setShowCheckOutPicker(true)}
+                        disabled={loading}>
                         <Ionicons name="calendar-outline" size={20} color="#64748b" />
-                        <Text style={styles.dateText}>{formatDate(checkOutDate)}</Text>
+                        <Text style={styles.dateText}>{formatDateForDisplay(checkOutDate)}</Text>
                         <Ionicons name="chevron-down-outline" size={20} color="#64748b" />
                     </TouchableOpacity>
                 </View>
 
-                {/* Nights & Total Summary */}
                 {calculateNights() > 0 && (
                     <View style={styles.summaryCard}>
                         <View style={styles.summaryRow}>
@@ -434,7 +445,6 @@ export default function BookingFormScreen() {
                     </View>
                 )}
 
-                {/* Deposit */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Tiền trả trước (đặt cọc)</Text>
                     <View style={[
@@ -449,6 +459,7 @@ export default function BookingFormScreen() {
                             onChangeText={handleDepositChange}
                             keyboardType="numeric"
                             placeholderTextColor="#94a3b8"
+                            editable={!loading}
                         />
                         <Text style={styles.currency}>đ</Text>
                     </View>
@@ -457,7 +468,6 @@ export default function BookingFormScreen() {
                     ) : null}
                 </View>
 
-                {/* Room Info Card */}
                 <View style={styles.roomInfoCard}>
                     <Text style={styles.roomInfoTitle}>Thông tin phòng</Text>
                     <View style={styles.divider} />
@@ -466,7 +476,7 @@ export default function BookingFormScreen() {
                             <Ionicons name="home-outline" size={20} color="#4a90e2" />
                             <Text style={styles.roomInfoLabel}>Loại phòng</Text>
                         </View>
-                        <Text style={styles.roomInfoValue}>{room.type}</Text>
+                        <Text style={styles.roomInfoValue}>{room.roomTypeName}</Text>
                     </View>
                     <View style={styles.roomInfoRow}>
                         <View style={styles.roomInfoItem}>
@@ -486,7 +496,6 @@ export default function BookingFormScreen() {
                     </View>
                 </View>
 
-                {/* Notes */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Ghi chú</Text>
                     <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
@@ -499,6 +508,7 @@ export default function BookingFormScreen() {
                             numberOfLines={4}
                             textAlignVertical="top"
                             placeholderTextColor="#94a3b8"
+                            editable={!loading}
                         />
                     </View>
                 </View>
@@ -506,28 +516,34 @@ export default function BookingFormScreen() {
                 <View style={styles.bottomSpace} />
             </ScrollView>
 
-            {/* Footer Buttons */}
             <View style={styles.footer}>
                 <TouchableOpacity
                     style={styles.cancelBtn}
-                    onPress={() => navigation.goBack()}>
+                    onPress={() => navigation.goBack()}
+                    disabled={loading}>
                     <Text style={styles.cancelBtnText}>Hủy</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={styles.submitBtn}
-                    onPress={handleSubmitBooking}>
+                    style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+                    onPress={handleSubmitBooking}
+                    disabled={loading}>
                     <LinearGradient
-                        colors={['#4a90e2', '#357abd']}
+                        colors={loading ? ['#94a3b8', '#64748b'] : ['#4a90e2', '#357abd']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={styles.submitBtnGradient}>
-                        <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                        <Text style={styles.submitBtnText}>Xác nhận đặt phòng</Text>
+                        {loading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+                        )}
+                        <Text style={styles.submitBtnText}>
+                            {loading ? 'Đang xử lý...' : 'Xác nhận đặt phòng'}
+                        </Text>
                     </LinearGradient>
                 </TouchableOpacity>
             </View>
 
-            {/* Calendar Pickers */}
             <CalendarPicker
                 visible={showCheckInPicker}
                 onClose={() => setShowCheckInPicker(false)}
@@ -767,6 +783,9 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '700',
         color: '#64748b',
+    },
+    submitBtnDisabled: {
+        opacity: 0.7,
     },
     submitBtn: {
         flex: 2,

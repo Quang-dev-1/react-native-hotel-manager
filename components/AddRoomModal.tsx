@@ -1,9 +1,9 @@
-// app/(drawer)/components/modals/AddRoomModal.tsx
-import { useRoom } from '@/contexts/RoomContext';
+import roomService from '@/services/roomService';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Modal,
     ScrollView,
@@ -17,21 +17,57 @@ import {
 interface AddRoomModalProps {
     visible: boolean;
     onClose: () => void;
+    onSuccess?: () => void;
 }
 
-export default function AddRoomModal({ visible, onClose }: AddRoomModalProps) {
-    const { addRoom, roomTypes, getRoomTypeByName } = useRoom();
+interface RoomType {
+    id?: number;
+    name: string;
+    basePrice: number;
+    maxOccupancy: number;
+    description?: string;
+}
+
+export default function AddRoomModal({ visible, onClose, onSuccess }: AddRoomModalProps) {
+    const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [loadingRoomTypes, setLoadingRoomTypes] = useState(false);
 
     const [newRoom, setNewRoom] = useState({
         number: '',
-        type: roomTypes[0]?.name || 'Tiêu chuẩn',
+        type: '',
         floor: '1',
+        description: '',
     });
 
     const [errors, setErrors] = useState({
         number: '',
         floor: '',
+        type: '',
     });
+
+    useEffect(() => {
+        if (visible) {
+            fetchRoomTypes();
+        }
+    }, [visible]);
+
+    const fetchRoomTypes = async () => {
+        try {
+            setLoadingRoomTypes(true);
+            const types = await roomService.getRoomTypes();
+            setRoomTypes(types);
+
+            if (types.length > 0 && !newRoom.type) {
+                setNewRoom(prev => ({ ...prev, type: types[0].name }));
+            }
+        } catch (error: any) {
+            console.error('Error fetching room types:', error);
+            Alert.alert('Lỗi', error.message || 'Không thể tải danh sách loại phòng');
+        } finally {
+            setLoadingRoomTypes(false);
+        }
+    };
 
     const validateRoomNumber = (text: string) => {
         if (!text.trim()) {
@@ -54,6 +90,13 @@ export default function AddRoomModal({ visible, onClose }: AddRoomModalProps) {
         return '';
     };
 
+    const validateRoomType = (type: string) => {
+        if (!type.trim()) {
+            return 'Vui lòng chọn loại phòng';
+        }
+        return '';
+    };
+
     const handleRoomNumberChange = (text: string) => {
         setNewRoom({ ...newRoom, number: text });
         setErrors({ ...errors, number: validateRoomNumber(text) });
@@ -64,44 +107,80 @@ export default function AddRoomModal({ visible, onClose }: AddRoomModalProps) {
         setErrors({ ...errors, floor: validateFloor(text) });
     };
 
-    const handleAddRoom = () => {
+    const handleAddRoom = async () => {
         const numberError = validateRoomNumber(newRoom.number);
         const floorError = validateFloor(newRoom.floor);
+        const typeError = validateRoomType(newRoom.type);
 
         setErrors({
             number: numberError,
             floor: floorError,
+            type: typeError,
         });
 
-        if (numberError || floorError) {
+        if (numberError || floorError || typeError) {
             Alert.alert('Lỗi', 'Vui lòng kiểm tra lại thông tin');
             return;
         }
 
-        const roomType = getRoomTypeByName(newRoom.type);
-        if (!roomType) {
+        const selectedRoomType = roomTypes.find(rt => rt.name === newRoom.type);
+        if (!selectedRoomType) {
             Alert.alert('Lỗi', 'Loại phòng không hợp lệ');
             return;
         }
 
-        addRoom({
-            roomNumber: newRoom.number.trim(),
-            type: newRoom.type,
-            floor: parseInt(newRoom.floor),
-            price: roomType.price,
-        });
+        try {
+            setLoading(true);
 
-        Alert.alert('Thành công', `Đã thêm phòng ${newRoom.number} thành công!`, [
-            {
-                text: 'OK',
-                onPress: () => {
-                    onClose();
-                    setNewRoom({ number: '', type: roomTypes[0]?.name || 'Tiêu chuẩn', floor: '1' });
-                    setErrors({ number: '', floor: '' });
+            const roomData = {
+                roomNumber: newRoom.number.trim(),
+                roomTypeName: newRoom.type,
+                floor: parseInt(newRoom.floor),
+                price: selectedRoomType.basePrice,
+                status: 'AVAILABLE',
+                description: newRoom.description.trim(),
+            };
+
+            await roomService.addRoom(roomData);
+
+            Alert.alert('Thành công', `Đã thêm phòng ${newRoom.number} thành công!`, [
+                {
+                    text: 'OK',
+                    onPress: () => {
+                        onClose();
+                        setNewRoom({
+                            number: '',
+                            type: roomTypes[0]?.name || '',
+                            floor: '1',
+                            description: '',
+                        });
+                        setErrors({ number: '', floor: '', type: '' });
+                        if (onSuccess) onSuccess();
+                    },
                 },
-            },
-        ]);
+            ]);
+        } catch (error: any) {
+            console.error('Error adding room:', error);
+            Alert.alert('Lỗi', error.message || 'Không thể thêm phòng');
+        } finally {
+            setLoading(false);
+        }
     };
+
+    if (loadingRoomTypes) {
+        return (
+            <Modal visible={visible} animationType="slide" transparent>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color="#4a90e2" />
+                            <Text style={styles.loadingText}>Đang tải...</Text>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        );
+    }
 
     return (
         <Modal visible={visible} animationType="slide" transparent>
@@ -109,7 +188,7 @@ export default function AddRoomModal({ visible, onClose }: AddRoomModalProps) {
                 <View style={styles.modalContent}>
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalTitle}>Thêm phòng mới</Text>
-                        <TouchableOpacity onPress={onClose}>
+                        <TouchableOpacity onPress={onClose} disabled={loading}>
                             <Ionicons name="close" size={24} color="#64748b" />
                         </TouchableOpacity>
                     </View>
@@ -131,6 +210,7 @@ export default function AddRoomModal({ visible, onClose }: AddRoomModalProps) {
                                     value={newRoom.number}
                                     onChangeText={handleRoomNumberChange}
                                     placeholderTextColor="#94a3b8"
+                                    editable={!loading}
                                 />
                             </View>
                             {errors.number ? (
@@ -143,34 +223,53 @@ export default function AddRoomModal({ visible, onClose }: AddRoomModalProps) {
                             <Text style={styles.inputLabel}>
                                 Loại phòng <Text style={styles.required}>*</Text>
                             </Text>
-                            <View style={styles.radioGroup}>
-                                {roomTypes.map((roomType) => (
-                                    <TouchableOpacity
-                                        key={roomType.id}
-                                        style={[
-                                            styles.radioButton,
-                                            newRoom.type === roomType.name && styles.radioButtonActive,
-                                        ]}
-                                        onPress={() => setNewRoom({ ...newRoom, type: roomType.name })}>
-                                        <View style={styles.radioContent}>
-                                            <Text
-                                                style={[
-                                                    styles.radioText,
-                                                    newRoom.type === roomType.name && styles.radioTextActive,
-                                                ]}>
-                                                {roomType.name}
-                                            </Text>
-                                            <Text
-                                                style={[
-                                                    styles.radioPriceText,
-                                                    newRoom.type === roomType.name && styles.radioPriceTextActive,
-                                                ]}>
-                                                {roomType.price.toLocaleString('vi-VN')}đ
-                                            </Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
+                            {roomTypes.length === 0 ? (
+                                <Text style={styles.noDataText}>
+                                    Chưa có loại phòng nào. Vui lòng thêm loại phòng trước.
+                                </Text>
+                            ) : (
+                                <View style={styles.radioGroup}>
+                                    {roomTypes.map((roomType) => (
+                                        <TouchableOpacity
+                                            key={roomType.id}
+                                            style={[
+                                                styles.radioButton,
+                                                newRoom.type === roomType.name && styles.radioButtonActive,
+                                            ]}
+                                            onPress={() => setNewRoom({ ...newRoom, type: roomType.name })}
+                                            disabled={loading}>
+                                            <View style={styles.radioContent}>
+                                                <View style={styles.radioLeft}>
+                                                    <Text
+                                                        style={[
+                                                            styles.radioText,
+                                                            newRoom.type === roomType.name && styles.radioTextActive,
+                                                        ]}>
+                                                        {roomType.name}
+                                                    </Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.radioCapacity,
+                                                            newRoom.type === roomType.name && styles.radioCapacityActive,
+                                                        ]}>
+                                                        <Ionicons name="people" size={12} /> {roomType.maxOccupancy} người
+                                                    </Text>
+                                                </View>
+                                                <Text
+                                                    style={[
+                                                        styles.radioPriceText,
+                                                        newRoom.type === roomType.name && styles.radioPriceTextActive,
+                                                    ]}>
+                                                    {roomType.basePrice.toLocaleString('vi-VN')}đ
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                            {errors.type ? (
+                                <Text style={styles.errorText}>{errors.type}</Text>
+                            ) : null}
                         </View>
 
                         {/* Floor */}
@@ -190,6 +289,7 @@ export default function AddRoomModal({ visible, onClose }: AddRoomModalProps) {
                                     onChangeText={handleFloorChange}
                                     keyboardType="numeric"
                                     placeholderTextColor="#94a3b8"
+                                    editable={!loading}
                                 />
                             </View>
                             {errors.floor ? (
@@ -197,20 +297,55 @@ export default function AddRoomModal({ visible, onClose }: AddRoomModalProps) {
                             ) : null}
                         </View>
 
+                        {/* Description */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Mô tả phòng</Text>
+                            <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
+                                <TextInput
+                                    style={[styles.input, styles.textArea]}
+                                    placeholder="Mô tả về phòng, vị trí, view, đặc điểm riêng..."
+                                    value={newRoom.description}
+                                    onChangeText={(text) =>
+                                        setNewRoom({ ...newRoom, description: text })
+                                    }
+                                    multiline
+                                    numberOfLines={4}
+                                    textAlignVertical="top"
+                                    placeholderTextColor="#94a3b8"
+                                    editable={!loading}
+                                />
+                            </View>
+                            <Text style={styles.helperText}>
+                                Ví dụ: Phòng hướng biển, view đẹp, gần thang máy...
+                            </Text>
+                        </View>
+
                     </ScrollView>
 
                     <View style={styles.modalFooter}>
-                        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                        <TouchableOpacity
+                            style={styles.cancelButton}
+                            onPress={onClose}
+                            disabled={loading}>
                             <Text style={styles.cancelButtonText}>Hủy</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.submitButton} onPress={handleAddRoom}>
+                        <TouchableOpacity
+                            style={styles.submitButton}
+                            onPress={handleAddRoom}
+                            disabled={loading || roomTypes.length === 0}>
                             <LinearGradient
-                                colors={['#4a90e2', '#357abd']}
+                                colors={loading || roomTypes.length === 0 ? ['#94a3b8', '#64748b'] : ['#4a90e2', '#357abd']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.submitGradient}>
-                                <Ionicons name="add-circle-outline" size={20} color="#fff" />
-                                <Text style={styles.submitButtonText}>Thêm phòng</Text>
+                                {loading ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="add-circle-outline" size={20} color="#fff" />
+                                        <Text style={styles.submitButtonText}>Thêm phòng</Text>
+                                    </>
+                                )}
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
@@ -287,12 +422,19 @@ const styles = StyleSheet.create({
         marginTop: 4,
         marginLeft: 4,
     },
+    helperText: {
+        fontSize: 12,
+        color: '#64748b',
+        marginTop: 4,
+        marginLeft: 4,
+        fontStyle: 'italic',
+    },
     radioGroup: {
         gap: 12,
     },
     radioButton: {
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 14,
         borderRadius: 12,
         borderWidth: 2,
         borderColor: '#e2e8f0',
@@ -307,6 +449,10 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
+    radioLeft: {
+        flex: 1,
+        gap: 4,
+    },
     radioText: {
         fontSize: 15,
         fontWeight: '600',
@@ -315,15 +461,37 @@ const styles = StyleSheet.create({
     radioTextActive: {
         color: '#4a90e2',
     },
+    radioCapacity: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#94a3b8',
+    },
+    radioCapacityActive: {
+        color: '#4a90e2',
+    },
     radioPriceText: {
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#94a3b8',
     },
     radioPriceTextActive: {
         color: '#4a90e2',
     },
-
+    noDataText: {
+        fontSize: 14,
+        color: '#ef4444',
+        fontStyle: 'italic',
+        textAlign: 'center',
+        paddingVertical: 12,
+    },
+    textAreaWrapper: {
+        alignItems: 'flex-start',
+        paddingVertical: 12,
+    },
+    textArea: {
+        minHeight: 100,
+        textAlignVertical: 'top',
+    },
     modalFooter: {
         flexDirection: 'row',
         gap: 12,
@@ -360,5 +528,16 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#fff',
+    },
+    loadingContainer: {
+        padding: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#64748b',
+        fontWeight: '500',
     },
 });

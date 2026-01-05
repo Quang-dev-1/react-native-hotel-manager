@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import authService from '../../services/authService';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
@@ -24,8 +27,8 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Error states
   const [nameError, setNameError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
@@ -33,10 +36,9 @@ export default function RegisterScreen() {
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [termsError, setTermsError] = useState('');
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     let hasError = false;
 
-    // Validate name
     if (!name.trim()) {
       setNameError('Please enter your full name');
       hasError = true;
@@ -44,7 +46,6 @@ export default function RegisterScreen() {
       setNameError('');
     }
 
-    // Validate email
     if (!email.trim()) {
       setEmailError('Please enter your email');
       hasError = true;
@@ -55,7 +56,6 @@ export default function RegisterScreen() {
       setEmailError('');
     }
 
-    // Validate phone
     if (!phone.trim()) {
       setPhoneError('Please enter your phone number');
       hasError = true;
@@ -66,7 +66,6 @@ export default function RegisterScreen() {
       setPhoneError('');
     }
 
-    // Validate password
     if (!password.trim()) {
       setPasswordError('Please enter your password');
       hasError = true;
@@ -77,7 +76,6 @@ export default function RegisterScreen() {
       setPasswordError('');
     }
 
-    // Validate confirm password
     if (!confirmPassword.trim()) {
       setConfirmPasswordError('Please confirm your password');
       hasError = true;
@@ -88,7 +86,6 @@ export default function RegisterScreen() {
       setConfirmPasswordError('');
     }
 
-    // Validate terms
     if (!agreeTerms) {
       setTermsError('Please agree to Terms and Privacy Policy');
       hasError = true;
@@ -98,8 +95,39 @@ export default function RegisterScreen() {
 
     if (hasError) return;
 
-    // Registration successful
-    router.replace('/(drawer)/dashboard');
+    try {
+      setLoading(true);
+
+      // Gửi fullName thay vì name để khớp với backend
+      await authService.register({
+        fullName: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password: password,
+      });
+
+      Alert.alert(
+        'Success',
+        'Registration successful! Please login with your credentials.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/(auth)/login'),
+          },
+        ]
+      );
+    } catch (error: any) {
+      const errorMessage = error.message || 'Registration failed. Please try again.';
+      Alert.alert('Registration Failed', errorMessage);
+
+      if (errorMessage.toLowerCase().includes('email')) {
+        setEmailError(errorMessage);
+      } else if (errorMessage.toLowerCase().includes('phone')) {
+        setPhoneError(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -113,7 +141,6 @@ export default function RegisterScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
 
-          {/* Logo & Title */}
           <View style={styles.header}>
             <Image
               style={styles.logo}
@@ -123,9 +150,7 @@ export default function RegisterScreen() {
             <Text style={styles.subtitle}>Join us to start shopping</Text>
           </View>
 
-          {/* Form */}
           <View style={styles.form}>
-            {/* Name Input */}
             <View>
               <View style={[styles.input, nameError && styles.inputError]}>
                 <Ionicons name="person" size={20} color="#1f2035ff" />
@@ -139,6 +164,7 @@ export default function RegisterScreen() {
                   }}
                   autoCapitalize="words"
                   placeholderTextColor="#9ca3af"
+                  editable={!loading}
                 />
               </View>
               {nameError ? (
@@ -149,7 +175,6 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
-            {/* Email Input */}
             <View>
               <View style={[styles.input, emailError && styles.inputError]}>
                 <Ionicons name="mail" size={20} color="#1f2035ff" />
@@ -164,6 +189,7 @@ export default function RegisterScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   placeholderTextColor="#9ca3af"
+                  editable={!loading}
                 />
               </View>
               {emailError ? (
@@ -174,7 +200,6 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
-            {/* Phone Input */}
             <View>
               <View style={[styles.input, phoneError && styles.inputError]}>
                 <Ionicons name="call" size={20} color="#1f2035ff" />
@@ -188,6 +213,7 @@ export default function RegisterScreen() {
                   }}
                   keyboardType="phone-pad"
                   placeholderTextColor="#9ca3af"
+                  editable={!loading}
                 />
               </View>
               {phoneError ? (
@@ -198,7 +224,6 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
-            {/* Password Input */}
             <View>
               <View style={[styles.input, passwordError && styles.inputError]}>
                 <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
@@ -213,6 +238,7 @@ export default function RegisterScreen() {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   placeholderTextColor="#9ca3af"
+                  editable={!loading}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                   <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={20} color="#9ca3af" />
@@ -226,7 +252,6 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
-            {/* Confirm Password Input */}
             <View>
               <View style={[styles.input, confirmPasswordError && styles.inputError]}>
                 <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
@@ -241,6 +266,7 @@ export default function RegisterScreen() {
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
                   placeholderTextColor="#9ca3af"
+                  editable={!loading}
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
                   <Ionicons name={showConfirmPassword ? 'eye' : 'eye-off'} size={20} color="#9ca3af" />
@@ -254,14 +280,14 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
-            {/* Terms Checkbox */}
             <View>
               <TouchableOpacity
                 style={styles.terms}
                 onPress={() => {
                   setAgreeTerms(!agreeTerms);
                   setTermsError('');
-                }}>
+                }}
+                disabled={loading}>
                 <View style={[styles.checkbox, agreeTerms && styles.checkboxActive]}>
                   {agreeTerms && <View style={styles.checkDot} />}
                 </View>
@@ -277,38 +303,45 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
-            {/* Register Button */}
-            <TouchableOpacity onPress={handleRegister} style={styles.btnWrap}>
+            <TouchableOpacity
+              onPress={handleRegister}
+              style={styles.btnWrap}
+              disabled={loading}>
               <LinearGradient colors={['#1f2035ff', '#151165ff']} style={styles.btn}>
-                <Text style={styles.btnTxt}>Create Account</Text>
-                <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Text style={styles.btnTxt}>Create Account</Text>
+                    <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Divider */}
             <View style={styles.divider}>
               <View style={styles.line} />
               <Text style={styles.dividerTxt}>OR</Text>
               <View style={styles.line} />
             </View>
 
-            {/* Social Buttons */}
             <View style={styles.social}>
-              <TouchableOpacity style={styles.socialBtn}>
+              <TouchableOpacity style={styles.socialBtn} disabled={loading}>
                 <Ionicons name="logo-google" size={22} color="#DB4437" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
+              <TouchableOpacity style={styles.socialBtn} disabled={loading}>
                 <Ionicons name="logo-facebook" size={22} color="#1877F2" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
+              <TouchableOpacity style={styles.socialBtn} disabled={loading}>
                 <Ionicons name="logo-apple" size={22} color="#000" />
               </TouchableOpacity>
             </View>
 
-            {/* Sign In Link */}
             <View style={styles.signin}>
               <Text style={styles.signinTxt}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => router.back()}>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                disabled={loading}>
                 <Text style={styles.signinLink}>Sign In</Text>
               </TouchableOpacity>
             </View>

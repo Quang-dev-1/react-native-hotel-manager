@@ -1,9 +1,10 @@
 // app/(drawer)/components/modals/AddRoomTypeModal.tsx
-import { useRoom } from '@/contexts/RoomContext';
+import roomService from '@/services/roomService';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Modal,
     ScrollView,
@@ -17,10 +18,11 @@ import {
 interface AddRoomTypeModalProps {
     visible: boolean;
     onClose: () => void;
+    onSuccess?: () => void;
 }
 
-export default function AddRoomTypeModal({ visible, onClose }: AddRoomTypeModalProps) {
-    const { addRoomType } = useRoom();
+export default function AddRoomTypeModal({ visible, onClose, onSuccess }: AddRoomTypeModalProps) {
+    const [loading, setLoading] = useState(false);
 
     const [newRoomType, setNewRoomType] = useState({
         name: '',
@@ -82,7 +84,7 @@ export default function AddRoomTypeModal({ visible, onClose }: AddRoomTypeModalP
         setErrors({ ...errors, capacity: validateCapacity(text) });
     };
 
-    const handleAddRoomType = () => {
+    const handleAddRoomType = async () => {
         const nameError = validateName(newRoomType.name);
         const priceError = validatePrice(newRoomType.price);
         const capacityError = validateCapacity(newRoomType.capacity);
@@ -98,23 +100,35 @@ export default function AddRoomTypeModal({ visible, onClose }: AddRoomTypeModalP
             return;
         }
 
-        addRoomType({
-            name: newRoomType.name.trim(),
-            price: parseInt(newRoomType.price),
-            capacity: parseInt(newRoomType.capacity),
-            description: newRoomType.description.trim(),
-        });
+        try {
+            setLoading(true);
 
-        Alert.alert('Thành công', `Đã thêm loại phòng "${newRoomType.name}" thành công!`, [
-            {
-                text: 'OK',
-                onPress: () => {
-                    onClose();
-                    setNewRoomType({ name: '', price: '', capacity: '', description: '' });
-                    setErrors({ name: '', price: '', capacity: '' });
+            const roomTypeData = {
+                name: newRoomType.name.trim(),
+                basePrice: parseInt(newRoomType.price),
+                maxOccupancy: parseInt(newRoomType.capacity),
+                description: newRoomType.description.trim(),
+            };
+
+            await roomService.addRoomType(roomTypeData);
+
+            Alert.alert('Thành công', `Đã thêm loại phòng "${newRoomType.name}" thành công!`, [
+                {
+                    text: 'OK',
+                    onPress: () => {
+                        onClose();
+                        setNewRoomType({ name: '', price: '', capacity: '', description: '' });
+                        setErrors({ name: '', price: '', capacity: '' });
+                        if (onSuccess) onSuccess();
+                    },
                 },
-            },
-        ]);
+            ]);
+        } catch (error: any) {
+            console.error('Error adding room type:', error);
+            Alert.alert('Lỗi', error.message || 'Không thể thêm loại phòng');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -123,7 +137,7 @@ export default function AddRoomTypeModal({ visible, onClose }: AddRoomTypeModalP
                 <View style={styles.modalContent}>
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalTitle}>Thêm loại phòng mới</Text>
-                        <TouchableOpacity onPress={onClose}>
+                        <TouchableOpacity onPress={onClose} disabled={loading}>
                             <Ionicons name="close" size={24} color="#64748b" />
                         </TouchableOpacity>
                     </View>
@@ -145,6 +159,7 @@ export default function AddRoomTypeModal({ visible, onClose }: AddRoomTypeModalP
                                     value={newRoomType.name}
                                     onChangeText={handleNameChange}
                                     placeholderTextColor="#94a3b8"
+                                    editable={!loading}
                                 />
                             </View>
                             {errors.name ? (
@@ -169,6 +184,7 @@ export default function AddRoomTypeModal({ visible, onClose }: AddRoomTypeModalP
                                     onChangeText={handlePriceChange}
                                     keyboardType="numeric"
                                     placeholderTextColor="#94a3b8"
+                                    editable={!loading}
                                 />
                                 <Text style={styles.currency}>đ</Text>
                             </View>
@@ -199,6 +215,7 @@ export default function AddRoomTypeModal({ visible, onClose }: AddRoomTypeModalP
                                     onChangeText={handleCapacityChange}
                                     keyboardType="numeric"
                                     placeholderTextColor="#94a3b8"
+                                    editable={!loading}
                                 />
                                 <Text style={styles.unit}>người</Text>
                             </View>
@@ -222,23 +239,36 @@ export default function AddRoomTypeModal({ visible, onClose }: AddRoomTypeModalP
                                     numberOfLines={4}
                                     textAlignVertical="top"
                                     placeholderTextColor="#94a3b8"
+                                    editable={!loading}
                                 />
                             </View>
                         </View>
                     </ScrollView>
 
                     <View style={styles.modalFooter}>
-                        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                        <TouchableOpacity
+                            style={styles.cancelButton}
+                            onPress={onClose}
+                            disabled={loading}>
                             <Text style={styles.cancelButtonText}>Hủy</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.submitButton} onPress={handleAddRoomType}>
+                        <TouchableOpacity
+                            style={styles.submitButton}
+                            onPress={handleAddRoomType}
+                            disabled={loading}>
                             <LinearGradient
-                                colors={['#8b5cf6', '#7c3aed']}
+                                colors={loading ? ['#94a3b8', '#64748b'] : ['#8b5cf6', '#7c3aed']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.submitGradient}>
-                                <Ionicons name="add-circle-outline" size={20} color="#fff" />
-                                <Text style={styles.submitButtonText}>Thêm loại phòng</Text>
+                                {loading ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="add-circle-outline" size={20} color="#fff" />
+                                        <Text style={styles.submitButtonText}>Thêm loại phòng</Text>
+                                    </>
+                                )}
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
@@ -340,7 +370,6 @@ const styles = StyleSheet.create({
         minHeight: 100,
         textAlignVertical: 'top',
     },
-
     modalFooter: {
         flexDirection: 'row',
         gap: 12,

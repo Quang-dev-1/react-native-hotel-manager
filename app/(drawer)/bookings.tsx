@@ -1,8 +1,10 @@
-import { useBooking } from '@/contexts/BookingContext';
+import bookingService, { Booking } from '@/services/bookingService';
 import { Ionicons } from '@expo/vector-icons';
-import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     ScrollView,
     StyleSheet,
@@ -13,10 +15,28 @@ import {
 
 export default function BookingsScreen() {
     const navigation = useNavigation();
-    const { bookings, checkOut, cancelBooking } = useBooking();
-    const activeBookings = bookings.filter((b) => b.status === 'active');
+    const [bookings, setBookings] = useState<Booking[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const handleCheckOut = (id: number, roomNumber: string) => {
+    const fetchBookings = async () => {
+        try {
+            setLoading(true);
+            const data = await bookingService.getActiveBookings();
+            setBookings(data);
+        } catch (error: any) {
+            Alert.alert('Lỗi', error.message || 'Không thể tải danh sách đặt phòng');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchBookings();
+        }, [])
+    );
+
+    const handleCheckOut = async (id: number, roomNumber: string) => {
         Alert.alert(
             'Xác nhận trả phòng',
             `Bạn có chắc muốn trả phòng ${roomNumber}?`,
@@ -25,16 +45,21 @@ export default function BookingsScreen() {
                 {
                     text: 'Trả phòng',
                     style: 'destructive',
-                    onPress: () => {
-                        checkOut(id);
-                        Alert.alert('Thành công', 'Đã trả phòng thành công');
+                    onPress: async () => {
+                        try {
+                            await bookingService.checkOut(id);
+                            Alert.alert('Thành công', 'Đã trả phòng thành công');
+                            fetchBookings(); // Refresh list
+                        } catch (error: any) {
+                            Alert.alert('Lỗi', error.message || 'Không thể trả phòng');
+                        }
                     },
                 },
             ]
         );
     };
 
-    const handleCancelBooking = (id: number, roomNumber: string) => {
+    const handleCancelBooking = async (id: number, roomNumber: string) => {
         Alert.alert(
             'Hủy đặt phòng',
             `Bạn có chắc muốn hủy đặt phòng ${roomNumber}?`,
@@ -43,9 +68,14 @@ export default function BookingsScreen() {
                 {
                     text: 'Hủy đặt phòng',
                     style: 'destructive',
-                    onPress: () => {
-                        cancelBooking(id);
-                        Alert.alert('Thành công', 'Đã hủy đặt phòng');
+                    onPress: async () => {
+                        try {
+                            await bookingService.cancelBooking(id);
+                            Alert.alert('Thành công', 'Đã hủy đặt phòng');
+                            fetchBookings(); // Refresh list
+                        } catch (error: any) {
+                            Alert.alert('Lỗi', error.message || 'Không thể hủy đặt phòng');
+                        }
                     },
                 },
             ]
@@ -54,10 +84,13 @@ export default function BookingsScreen() {
 
     const getStatusColor = (status: string) => {
         switch (status) {
+            case 'ACTIVE':
             case 'active':
                 return '#22c55e';
+            case 'COMPLETED':
             case 'completed':
                 return '#3b82f6';
+            case 'CANCELLED':
             case 'cancelled':
                 return '#ef4444';
             default:
@@ -67,10 +100,13 @@ export default function BookingsScreen() {
 
     const getStatusText = (status: string) => {
         switch (status) {
+            case 'ACTIVE':
             case 'active':
                 return 'Đang thuê';
+            case 'COMPLETED':
             case 'completed':
                 return 'Đã trả';
+            case 'CANCELLED':
             case 'cancelled':
                 return 'Đã hủy';
             default:
@@ -78,7 +114,32 @@ export default function BookingsScreen() {
         }
     };
 
-    if (activeBookings.length === 0) {
+    if (loading) {
+        return (
+            <View style={styles.container}>
+                <LinearGradient
+                    colors={['#4a90e2', '#357abd']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.header}>
+                    <View style={styles.headerTop}>
+                        <TouchableOpacity
+                            style={styles.menuButton}
+                            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+                            <Ionicons name="menu" size={28} color="#fff" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>Quản lý đặt phòng</Text>
+                    </View>
+                </LinearGradient>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#4a90e2" />
+                    <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+                </View>
+            </View>
+        );
+    }
+
+    if (bookings.length === 0) {
         return (
             <View style={styles.container}>
                 <LinearGradient
@@ -127,11 +188,11 @@ export default function BookingsScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.bookingHeader}>
                     <Text style={styles.bookingHeaderText}>
-                        Có {activeBookings.length} phòng đang được thuê
+                        Có {bookings.length} phòng đang được thuê
                     </Text>
                 </View>
 
-                {activeBookings.map((booking) => (
+                {bookings.map((booking) => (
                     <View key={booking.id} style={styles.bookingCard}>
                         <View style={styles.cardHeader}>
                             <View style={styles.roomInfo}>
@@ -209,7 +270,7 @@ export default function BookingsScreen() {
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.cancelButton]}
                                 onPress={() =>
-                                    handleCancelBooking(booking.id, booking.roomNumber)
+                                    handleCancelBooking(booking.id!, booking.roomNumber!)
                                 }>
                                 <Ionicons name="close-circle-outline" size={20} color="#ef4444" />
                                 <Text style={styles.cancelButtonText}>Hủy</Text>
@@ -217,7 +278,7 @@ export default function BookingsScreen() {
 
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.checkoutButton]}
-                                onPress={() => handleCheckOut(booking.id, booking.roomNumber)}>
+                                onPress={() => handleCheckOut(booking.id!, booking.roomNumber!)}>
                                 <LinearGradient
                                     colors={['#4a90e2', '#357abd']}
                                     start={{ x: 0, y: 0 }}
@@ -263,6 +324,18 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#fff',
         flex: 1,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 32,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#64748b',
+        fontWeight: '500',
     },
     bookingHeader: {
         padding: 16,

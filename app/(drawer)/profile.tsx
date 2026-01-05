@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -10,29 +12,45 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import authService from '../../services/authService';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
-  const user = {
-    name: 'Admin',
-    email: 'admin@hotel.com',
-    phone: '0367470332',
-    role: 'Quản lý',
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUserData();
+    }, [])
+  );
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      const userData = await authService.getCurrentUser();
+      console.log('📱 User data loaded:', userData);
+      setUser(userData);
+    } catch (error) {
+      console.error('❌ Error loading user:', error);
+      Alert.alert('Error', 'Failed to load user data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc muốn đăng xuất?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đăng xuất',
-          style: 'destructive',
-          onPress: () => router.replace('/(auth)/login'),
+    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Đăng xuất',
+        style: 'destructive',
+        onPress: async () => {
+          await authService.logout();
+          router.replace('/(auth)/login');
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const menuItems = [
@@ -68,6 +86,29 @@ export default function ProfileScreen() {
     },
   ];
 
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#4a90e2" />
+        <Text style={styles.loadingText}>Đang tải...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Ionicons name="alert-circle-outline" size={64} color="#ef4444" />
+        <Text style={styles.errorText}>Không tìm thấy thông tin người dùng</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => router.replace('/(auth)/login')}>
+          <Text style={styles.retryButtonText}>Đăng nhập lại</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -91,18 +132,20 @@ export default function ProfileScreen() {
             <Ionicons name="person" size={50} color="#fff" />
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user.name}</Text>
-            <Text style={styles.userRole}>{user.role}</Text>
+            <Text style={styles.userName}>{user.fullName || user.email}</Text>
+            <Text style={styles.userRole}>{user.role || 'USER'}</Text>
           </View>
           <View style={styles.userDetails}>
             <View style={styles.detailRow}>
               <Ionicons name="mail-outline" size={16} color="#64748b" />
               <Text style={styles.detailText}>{user.email}</Text>
             </View>
-            <View style={styles.detailRow}>
-              <Ionicons name="call-outline" size={16} color="#64748b" />
-              <Text style={styles.detailText}>{user.phone}</Text>
-            </View>
+            {user.phone && (
+              <View style={styles.detailRow}>
+                <Ionicons name="call-outline" size={16} color="#64748b" />
+                <Text style={styles.detailText}>{user.phone}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -146,6 +189,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ef4444',
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    backgroundColor: '#4a90e2',
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '700',
   },
   header: {
     paddingTop: 50,
@@ -206,6 +277,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     fontWeight: '500',
+    textTransform: 'uppercase',
   },
   userDetails: {
     width: '100%',

@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -12,25 +14,21 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
+import authService from '../../services/authService';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const mockUsers = [
-    { email: '1', password: '1' },
-    { email: 'admin@shop.com', password: 'admin123' },
-    { email: 'test@test.com', password: 'test123' },
-  ];
-
-  const handleLogin = () => {
+  const handleLogin = async () => {
     let hasError = false;
 
     if (!email.trim()) {
@@ -40,7 +38,6 @@ export default function LoginScreen() {
       setEmailError('');
     }
 
-    // Validate password
     if (!password.trim()) {
       setPasswordError('Please enter your password');
       hasError = true;
@@ -50,15 +47,26 @@ export default function LoginScreen() {
 
     if (hasError) return;
 
-    const user = mockUsers.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
+    try {
+      setLoading(true);
 
-    if (user) {
-      router.replace('/(drawer)/dashboard');
-    } else {
-      setEmailError('Invalid email or password');
-      setPasswordError('Invalid email or password');
+      const response = await authService.login({
+        email: email.trim(),
+        password: password,
+      });
+
+      Alert.alert('Success', 'Login successful!', [
+        {
+          text: 'OK',
+          onPress: () => router.replace('/(drawer)/dashboard'),
+        },
+      ]);
+    } catch (error: any) {
+      const errorMessage = error.message || 'Login failed. Please try again.';
+      setEmailError(errorMessage);
+      setPasswordError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,7 +81,6 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
 
-          {/* Logo & Title */}
           <View style={styles.header}>
             <Image
               style={styles.logo}
@@ -83,9 +90,7 @@ export default function LoginScreen() {
             <Text style={styles.subtitle}>Sign in to your account</Text>
           </View>
 
-          {/* Form */}
           <View style={styles.form}>
-            {/* Email Input */}
             <View>
               <View style={[styles.input, emailError && styles.inputError]}>
                 <Ionicons name="mail" size={20} color="#1f2035ff" />
@@ -100,6 +105,7 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   placeholderTextColor="#9ca3af"
+                  editable={!loading}
                 />
               </View>
               {emailError ? (
@@ -110,7 +116,6 @@ export default function LoginScreen() {
               ) : null}
             </View>
 
-            {/* Password Input */}
             <View>
               <View style={[styles.input, passwordError && styles.inputError]}>
                 <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
@@ -125,6 +130,7 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   placeholderTextColor="#9ca3af"
+                  editable={!loading}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                   <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={20} color="#9ca3af" />
@@ -138,54 +144,63 @@ export default function LoginScreen() {
               ) : null}
             </View>
 
-            {/* Remember & Forgot */}
             <View style={styles.row}>
               <TouchableOpacity
                 style={styles.remember}
-                onPress={() => setRememberMe(!rememberMe)}>
+                onPress={() => setRememberMe(!rememberMe)}
+                disabled={loading}>
                 <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
                   {rememberMe && <View style={styles.checkDot} />}
                 </View>
                 <Text style={styles.rememberTxt}>Remember me</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => router.push('/(auth)/ForgotPasswordScreen')}>
+              <TouchableOpacity
+                onPress={() => router.push('/(auth)/ForgotPasswordScreen')}
+                disabled={loading}>
                 <Text style={styles.forgot}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Login Button */}
-            <TouchableOpacity onPress={handleLogin} style={styles.btnWrap}>
+            <TouchableOpacity
+              onPress={handleLogin}
+              style={styles.btnWrap}
+              disabled={loading}>
               <LinearGradient colors={['#1f2035ff', '#151165ff']} style={styles.btn}>
-                <Text style={styles.btnTxt}>Sign In</Text>
-                <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Text style={styles.btnTxt}>Sign In</Text>
+                    <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Divider */}
             <View style={styles.divider}>
               <View style={styles.line} />
               <Text style={styles.dividerTxt}>OR</Text>
               <View style={styles.line} />
             </View>
 
-            {/* Social Buttons */}
             <View style={styles.social}>
-              <TouchableOpacity style={styles.socialBtn}>
+              <TouchableOpacity style={styles.socialBtn} disabled={loading}>
                 <Ionicons name="logo-google" size={22} color="#DB4437" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
+              <TouchableOpacity style={styles.socialBtn} disabled={loading}>
                 <Ionicons name="logo-facebook" size={22} color="#1877F2" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
+              <TouchableOpacity style={styles.socialBtn} disabled={loading}>
                 <Ionicons name="logo-apple" size={22} color="#000" />
               </TouchableOpacity>
             </View>
 
-            {/* Sign Up Link */}
             <View style={styles.signup}>
               <Text style={styles.signupTxt}>Don`t have an account? </Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+              <TouchableOpacity
+                onPress={() => router.push('/(auth)/register')}
+                disabled={loading}>
                 <Text style={styles.signupLink}>Sign Up</Text>
               </TouchableOpacity>
             </View>
