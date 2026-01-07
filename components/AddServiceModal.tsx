@@ -1,43 +1,122 @@
+import HotelServiceAPI from '@/services/hotelService';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Modal,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    TouchableOpacity,
+    TouchableOpacity, 
     View,
 } from 'react-native';
 
 interface AddServiceModalProps {
     visible: boolean;
     onClose: () => void;
+    onSuccess?: () => void; // Callback khi thêm thành công
 }
 
-export default function AddServiceModal({ visible, onClose }: AddServiceModalProps) {
+export default function AddServiceModal({ visible, onClose, onSuccess }: AddServiceModalProps) {
     const [newService, setNewService] = useState({
         name: '',
+        description: '',
         price: '',
-        category: 'food',
+        category: 'FOOD',
     });
+    const [loading, setLoading] = useState(false);
 
-    const handleAddService = () => {
-        if (!newService.name || !newService.price) {
-            Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+    const categoryOptions = [
+        { value: 'FOOD', label: 'Ăn uống' },
+        { value: 'LAUNDRY', label: 'Giặt là' },
+        { value: 'SPA', label: 'Spa & Massage' },
+        { value: 'ROOM_SERVICE', label: 'Phục vụ phòng' },
+        { value: 'TRANSPORT', label: 'Vận chuyển' },
+        { value: 'OTHER', label: 'Khác' },
+    ];
+
+    const handleAddService = async () => {
+        // Validation
+        if (!newService.name.trim()) {
+            Alert.alert('Lỗi', 'Vui lòng nhập tên dịch vụ');
             return;
         }
-        Alert.alert('Thành công', `Đã thêm dịch vụ ${newService.name}`, [
-            {
-                text: 'OK',
-                onPress: () => {
-                    onClose();
-                    setNewService({ name: '', price: '', category: 'food' });
-                },
-            },
-        ]);
+
+        if (!newService.price.trim()) {
+            Alert.alert('Lỗi', 'Vui lòng nhập giá dịch vụ');
+            return;
+        }
+
+        const price = parseFloat(newService.price);
+        if (isNaN(price) || price <= 0) {
+            Alert.alert('Lỗi', 'Giá dịch vụ phải là số dương');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const serviceData = {
+                name: newService.name.trim(),
+                description: newService.description.trim() || undefined,
+                price: price,
+                category: newService.category,
+                available: true, // Mặc định là available
+            };
+
+            console.log('📤 Adding service:', serviceData);
+
+            await HotelServiceAPI.addService(serviceData);
+
+            Alert.alert(
+                'Thành công',
+                `Đã thêm dịch vụ "${newService.name}"`,
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            // Reset form
+                            setNewService({
+                                name: '',
+                                description: '',
+                                price: '',
+                                category: 'FOOD',
+                            });
+
+                            // Callback để refresh danh sách
+                            if (onSuccess) {
+                                onSuccess();
+                            }
+
+                            onClose();
+                        },
+                    },
+                ]
+            );
+        } catch (error: any) {
+            console.error('❌ Add service error:', error);
+            Alert.alert(
+                'Lỗi',
+                error.message || 'Không thể thêm dịch vụ. Vui lòng thử lại.'
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleClose = () => {
+        if (!loading) {
+            setNewService({
+                name: '',
+                description: '',
+                price: '',
+                category: 'FOOD',
+            });
+            onClose();
+        }
     };
 
     return (
@@ -46,57 +125,87 @@ export default function AddServiceModal({ visible, onClose }: AddServiceModalPro
                 <View style={styles.modalContent}>
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalTitle}>Thêm dịch vụ</Text>
-                        <TouchableOpacity onPress={onClose}>
+                        <TouchableOpacity onPress={handleClose} disabled={loading}>
                             <Ionicons name="close" size={24} color="#64748b" />
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={styles.modalBody}>
+                    <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Tên dịch vụ</Text>
+                            <Text style={styles.inputLabel}>
+                                Tên dịch vụ <Text style={styles.required}>*</Text>
+                            </Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="Ví dụ: Giặt là, Massage..."
                                 value={newService.name}
-                                onChangeText={(text) => setNewService({ ...newService, name: text })}
+                                onChangeText={(text) =>
+                                    setNewService({ ...newService, name: text })
+                                }
+                                editable={!loading}
                             />
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Giá dịch vụ (VNĐ)</Text>
+                            <Text style={styles.inputLabel}>Mô tả dịch vụ</Text>
+                            <TextInput
+                                style={[styles.input, styles.textArea]}
+                                placeholder="Mô tả chi tiết về dịch vụ..."
+                                value={newService.description}
+                                onChangeText={(text) =>
+                                    setNewService({ ...newService, description: text })
+                                }
+                                multiline
+                                numberOfLines={3}
+                                textAlignVertical="top"
+                                editable={!loading}
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>
+                                Giá dịch vụ (VNĐ) <Text style={styles.required}>*</Text>
+                            </Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="Ví dụ: 50000"
                                 value={newService.price}
-                                onChangeText={(text) => setNewService({ ...newService, price: text })}
+                                onChangeText={(text) =>
+                                    setNewService({ ...newService, price: text })
+                                }
                                 keyboardType="numeric"
+                                editable={!loading}
                             />
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Loại dịch vụ</Text>
+                            <Text style={styles.inputLabel}>
+                                Loại dịch vụ <Text style={styles.required}>*</Text>
+                            </Text>
                             <View style={styles.radioGroup}>
-                                {['food', 'laundry', 'spa', 'other'].map((category) => (
+                                {categoryOptions.map((option) => (
                                     <TouchableOpacity
-                                        key={category}
+                                        key={option.value}
                                         style={[
                                             styles.radioButton,
-                                            newService.category === category && styles.radioButtonActive,
+                                            newService.category === option.value &&
+                                            styles.radioButtonActive,
                                         ]}
-                                        onPress={() => setNewService({ ...newService, category })}>
+                                        onPress={() =>
+                                            !loading &&
+                                            setNewService({
+                                                ...newService,
+                                                category: option.value,
+                                            })
+                                        }
+                                        disabled={loading}>
                                         <Text
                                             style={[
                                                 styles.radioText,
-                                                newService.category === category &&
+                                                newService.category === option.value &&
                                                 styles.radioTextActive,
                                             ]}>
-                                            {category === 'food'
-                                                ? 'Ăn uống'
-                                                : category === 'laundry'
-                                                    ? 'Giặt là'
-                                                    : category === 'spa'
-                                                        ? 'Spa'
-                                                        : 'Khác'}
+                                            {option.label}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
@@ -105,16 +214,26 @@ export default function AddServiceModal({ visible, onClose }: AddServiceModalPro
                     </ScrollView>
 
                     <View style={styles.modalFooter}>
-                        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                        <TouchableOpacity
+                            style={styles.cancelButton}
+                            onPress={handleClose}
+                            disabled={loading}>
                             <Text style={styles.cancelButtonText}>Hủy</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.submitButton} onPress={handleAddService}>
+                        <TouchableOpacity
+                            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                            onPress={handleAddService}
+                            disabled={loading}>
                             <LinearGradient
-                                colors={['#ec4899', '#db2777']}
+                                colors={loading ? ['#94a3b8', '#64748b'] : ['#ec4899', '#db2777']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.submitGradient}>
-                                <Text style={styles.submitButtonText}>Thêm dịch vụ</Text>
+                                {loading ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.submitButtonText}>Thêm dịch vụ</Text>
+                                )}
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
@@ -161,6 +280,9 @@ const styles = StyleSheet.create({
         color: '#1e293b',
         marginBottom: 8,
     },
+    required: {
+        color: '#ef4444',
+    },
     input: {
         backgroundColor: '#f8fafc',
         borderWidth: 1,
@@ -169,6 +291,10 @@ const styles = StyleSheet.create({
         padding: 16,
         fontSize: 16,
         color: '#1e293b',
+    },
+    textArea: {
+        minHeight: 80,
+        paddingTop: 12,
     },
     radioGroup: {
         flexDirection: 'row',
@@ -220,9 +346,14 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         overflow: 'hidden',
     },
+    submitButtonDisabled: {
+        opacity: 0.6,
+    },
     submitGradient: {
         paddingVertical: 16,
         alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 52,
     },
     submitButtonText: {
         fontSize: 16,

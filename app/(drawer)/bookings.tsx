@@ -36,10 +36,57 @@ export default function BookingsScreen() {
         }, [])
     );
 
+    // Xác nhận đặt phòng (PENDING -> CONFIRMED)
+    const handleConfirmBooking = async (id: number, roomNumber: string) => {
+        Alert.alert(
+            'Xác nhận đặt phòng',
+            `Bạn có chắc muốn xác nhận đặt phòng ${roomNumber}?`,
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Xác nhận',
+                    onPress: async () => {
+                        try {
+                            await bookingService.confirmBooking(id);
+                            Alert.alert('Thành công', 'Đã xác nhận đặt phòng');
+                            fetchBookings();
+                        } catch (error: any) {
+                            Alert.alert('Lỗi', error.message || 'Không thể xác nhận đặt phòng');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    // Nhận phòng (CONFIRMED -> CHECKED_IN)
+    const handleCheckIn = async (id: number, roomNumber: string) => {
+        Alert.alert(
+            'Nhận phòng',
+            `Xác nhận khách đã nhận phòng ${roomNumber}?`,
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Nhận phòng',
+                    onPress: async () => {
+                        try {
+                            await bookingService.checkIn(id);
+                            Alert.alert('Thành công', 'Khách đã nhận phòng');
+                            fetchBookings();
+                        } catch (error: any) {
+                            Alert.alert('Lỗi', error.message || 'Không thể nhận phòng');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    // Trả phòng (CHECKED_IN -> CHECKED_OUT)
     const handleCheckOut = async (id: number, roomNumber: string) => {
         Alert.alert(
             'Xác nhận trả phòng',
-            `Bạn có chắc muốn trả phòng ${roomNumber}?`,
+            `Bạn có chắc khách đã trả phòng ${roomNumber}?`,
             [
                 { text: 'Hủy', style: 'cancel' },
                 {
@@ -49,7 +96,7 @@ export default function BookingsScreen() {
                         try {
                             await bookingService.checkOut(id);
                             Alert.alert('Thành công', 'Đã trả phòng thành công');
-                            fetchBookings(); // Refresh list
+                            fetchBookings();
                         } catch (error: any) {
                             Alert.alert('Lỗi', error.message || 'Không thể trả phòng');
                         }
@@ -72,7 +119,7 @@ export default function BookingsScreen() {
                         try {
                             await bookingService.cancelBooking(id);
                             Alert.alert('Thành công', 'Đã hủy đặt phòng');
-                            fetchBookings(); // Refresh list
+                            fetchBookings();
                         } catch (error: any) {
                             Alert.alert('Lỗi', error.message || 'Không thể hủy đặt phòng');
                         }
@@ -84,14 +131,17 @@ export default function BookingsScreen() {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'ACTIVE':
-            case 'active':
+            case 'CHECKED_IN':
                 return '#22c55e';
-            case 'COMPLETED':
-            case 'completed':
+            case 'PENDING':
+                return '#f59e0b';
+            case 'CONFIRMED':
                 return '#3b82f6';
+            case 'CHECKED_OUT':
+                return '#8b5cf6';
+            case 'COMPLETED':
+                return '#06b6d4';
             case 'CANCELLED':
-            case 'cancelled':
                 return '#ef4444';
             default:
                 return '#64748b';
@@ -100,14 +150,17 @@ export default function BookingsScreen() {
 
     const getStatusText = (status: string) => {
         switch (status) {
-            case 'ACTIVE':
-            case 'active':
+            case 'PENDING':
+                return 'Chờ xác nhận';
+            case 'CONFIRMED':
+                return 'Đã xác nhận';
+            case 'CHECKED_IN':
                 return 'Đang thuê';
-            case 'COMPLETED':
-            case 'completed':
+            case 'CHECKED_OUT':
                 return 'Đã trả';
+            case 'COMPLETED':
+                return 'Hoàn thành';
             case 'CANCELLED':
-            case 'cancelled':
                 return 'Đã hủy';
             default:
                 return status;
@@ -188,7 +241,7 @@ export default function BookingsScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.bookingHeader}>
                     <Text style={styles.bookingHeaderText}>
-                        Có {bookings.length} phòng đang được thuê
+                        Có {bookings.length} phòng cần xử lý
                     </Text>
                 </View>
 
@@ -267,6 +320,7 @@ export default function BookingsScreen() {
                         </View>
 
                         <View style={styles.cardFooter}>
+                            {/* Nút Hủy - hiện với mọi trạng thái */}
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.cancelButton]}
                                 onPress={() =>
@@ -276,18 +330,53 @@ export default function BookingsScreen() {
                                 <Text style={styles.cancelButtonText}>Hủy</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={[styles.actionButton, styles.checkoutButton]}
-                                onPress={() => handleCheckOut(booking.id!, booking.roomNumber!)}>
-                                <LinearGradient
-                                    colors={['#4a90e2', '#357abd']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={styles.checkoutGradient}>
-                                    <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                                    <Text style={styles.checkoutButtonText}>Trả phòng</Text>
-                                </LinearGradient>
-                            </TouchableOpacity>
+                            {/* Nút Xác nhận - chỉ hiện khi PENDING */}
+                            {booking.status === 'PENDING' && (
+                                <TouchableOpacity
+                                    style={[styles.actionButton, styles.confirmButton]}
+                                    onPress={() => handleConfirmBooking(booking.id!, booking.roomNumber!)}>
+                                    <LinearGradient
+                                        colors={['#3b82f6', '#2563eb']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.confirmGradient}>
+                                        <Ionicons name="checkmark-done-outline" size={20} color="#fff" />
+                                        <Text style={styles.confirmButtonText}>Xác nhận</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            )}
+
+                            {/* Nút Nhận phòng - chỉ hiện khi CONFIRMED */}
+                            {booking.status === 'CONFIRMED' && (
+                                <TouchableOpacity
+                                    style={[styles.actionButton, styles.checkInButton]}
+                                    onPress={() => handleCheckIn(booking.id!, booking.roomNumber!)}>
+                                    <LinearGradient
+                                        colors={['#22c55e', '#16a34a']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.checkInGradient}>
+                                        <Ionicons name="enter-outline" size={20} color="#fff" />
+                                        <Text style={styles.checkInButtonText}>Nhận phòng</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            )}
+
+                            {/* Nút Trả phòng - chỉ hiện khi CHECKED_IN */}
+                            {booking.status === 'CHECKED_IN' && (
+                                <TouchableOpacity
+                                    style={[styles.actionButton, styles.checkoutButton]}
+                                    onPress={() => handleCheckOut(booking.id!, booking.roomNumber!)}>
+                                    <LinearGradient
+                                        colors={['#4a90e2', '#357abd']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.checkoutGradient}>
+                                        <Ionicons name="exit-outline" size={20} color="#fff" />
+                                        <Text style={styles.checkoutButtonText}>Trả phòng</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
                 ))}
@@ -501,6 +590,36 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: '#ef4444',
+    },
+    confirmButton: {
+        flex: 1,
+    },
+    confirmGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 12,
+    },
+    confirmButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    checkInButton: {
+        flex: 1,
+    },
+    checkInGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 12,
+    },
+    checkInButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#fff',
     },
     checkoutButton: {
         flex: 1,

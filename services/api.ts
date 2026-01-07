@@ -2,9 +2,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
 
+// Địa chỉ Railway backend của bạn
+const RAILWAY_DOMAIN = 'hotel-manager-backend-production.up.railway.app';
+
+// Chỉ dùng localhost khi development trên máy tính
 const COMPUTER_IP = '192.168.1.14';
 
 const getBaseURL = () => {
+  // Sử dụng Railway domain cho production (iOS và Android thật)
+  const useProduction = true; // Đổi thành false nếu muốn test local
+  
+  if (useProduction) {
+    return `https://${RAILWAY_DOMAIN}/api`;
+  }
+  
+  // Development mode - chỉ dùng khi test local
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:8080/api';
   } else if (Platform.OS === 'ios') {
@@ -53,10 +65,9 @@ apiClient.interceptors.response.use(
     } else if (error.message === 'Network Error') {
       console.error('🚫 Network Error - Cannot connect to server');
       console.error('Check:');
-      console.error('1. Backend is running');
-      console.error('2. IP address is correct:', COMPUTER_IP);
-      console.error('3. Phone and computer on same WiFi');
-      console.error('4. Firewall allows port 8080');
+      console.error('1. Backend is running on Railway');
+      console.error('2. Domain is correct:', RAILWAY_DOMAIN);
+      console.error('3. Internet connection is stable');
     } else {
       console.error('❌ Response error:', {
         status: error.response?.status,

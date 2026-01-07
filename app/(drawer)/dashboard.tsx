@@ -1,10 +1,13 @@
-import { useBooking } from '@/contexts/BookingContext';
+import BookingService, { DashboardStats } from '@/services/bookingService';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     Dimensions,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -16,9 +19,50 @@ const screenWidth = Dimensions.get('window').width;
 
 export default function DashboardScreen() {
     const navigation = useNavigation<any>();
-    const { getBookingStats } = useBooking();
-    const stats = getBookingStats();
-    const [selectedDate] = useState('17/12/2025');
+    const [stats, setStats] = useState<DashboardStats>({
+        todayRentals: 0,
+        occupiedRooms: 0,
+        waitingRooms: 0,
+        cleaningRooms: 0,
+        totalRooms: 0,
+        availableRooms: 0,
+    });
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const loadDashboardStats = async () => {
+        try {
+            console.log('📊 Loading dashboard stats...');
+            const data = await BookingService.getDashboardStats();
+            setStats(data);
+            console.log('✅ Dashboard stats loaded:', data);
+        } catch (error: any) {
+            console.error('❌ Load dashboard stats error:', error);
+            Alert.alert(
+                'Lỗi',
+                error.message || 'Không thể tải thống kê',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        loadDashboardStats();
+
+        const interval = setInterval(() => {
+            loadDashboardStats();
+        }, 30000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        loadDashboardStats();
+    };
 
     const statCards = [
         {
@@ -27,7 +71,7 @@ export default function DashboardScreen() {
             value: stats.todayRentals,
             color: ['#93c5fd', '#3b82f6'],
             bgColor: '#dbeafe',
-            filter: 'available'
+            filter: 'today'
         },
         {
             icon: 'bed-outline',
@@ -56,17 +100,25 @@ export default function DashboardScreen() {
     ];
 
     const chartData = [
-        { date: '08/12', value: 0 },
-        { date: '15/12', value: stats.todayRentals },
+        { date: 'Hôm qua', value: 0 },
+        { date: 'Hôm nay', value: stats.todayRentals },
     ];
 
     const maxValue = Math.max(...chartData.map(d => d.value), 1);
 
     const handleCardPress = (filter: string) => {
         navigation.dispatch(DrawerActions.closeDrawer());
-
         navigation.navigate('rental', { filter });
     };
+
+    if (loading) {
+        return (
+            <View style={[styles.container, styles.centerContent]}>
+                <ActivityIndicator size="large" color="#4a90e2" />
+                <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -82,10 +134,30 @@ export default function DashboardScreen() {
                         <Ionicons name="menu" size={28} color="#fff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Thông tin hệ thống</Text>
+                    <TouchableOpacity
+                        style={styles.refreshButton}
+                        onPress={onRefresh}
+                        disabled={refreshing}>
+                        <Ionicons
+                            name="refresh"
+                            size={24}
+                            color="#fff"
+                            style={refreshing ? styles.rotating : undefined}
+                        />
+                    </TouchableOpacity>
                 </View>
             </LinearGradient>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#4a90e2']}
+                    />
+                }
+            >
                 <View style={styles.statsGrid}>
                     {statCards.map((card, index) => (
                         <TouchableOpacity
@@ -103,6 +175,23 @@ export default function DashboardScreen() {
                             </View>
                         </TouchableOpacity>
                     ))}
+                </View>
+
+                <View style={styles.summaryContainer}>
+                    <View style={styles.summaryCard}>
+                        <Ionicons name="business-outline" size={24} color="#4a90e2" />
+                        <View style={styles.summaryText}>
+                            <Text style={styles.summaryValue}>{stats.totalRooms}</Text>
+                            <Text style={styles.summaryLabel}>Tổng số phòng</Text>
+                        </View>
+                    </View>
+                    <View style={styles.summaryCard}>
+                        <Ionicons name="checkmark-circle-outline" size={24} color="#22c55e" />
+                        <View style={styles.summaryText}>
+                            <Text style={styles.summaryValue}>{stats.availableRooms}</Text>
+                            <Text style={styles.summaryLabel}>Phòng trống</Text>
+                        </View>
+                    </View>
                 </View>
 
                 <View style={styles.chartContainer}>
@@ -128,6 +217,7 @@ export default function DashboardScreen() {
                                         />
                                     </View>
                                 </View>
+                                <Text style={styles.barValue}>{item.value}</Text>
                                 <Text style={styles.chartLabel}>{item.date}</Text>
                             </View>
                         ))}
@@ -139,26 +229,25 @@ export default function DashboardScreen() {
                     </View>
                 </View>
 
-                <View style={styles.bottomInfo}>
-                    <View style={styles.infoCard}>
-                        <View style={styles.infoIcon}>
-                            <Ionicons name="calendar" size={24} color="#4a90e2" />
-                        </View>
-                        <View style={styles.infoText}>
-                            <Text style={styles.infoValue}>{selectedDate}</Text>
-                            <Text style={styles.infoLabel}>Ngày được chọn</Text>
-                        </View>
+                <View style={styles.occupancyContainer}>
+                    <Text style={styles.sectionTitle}>Tỷ lệ sử dụng phòng</Text>
+                    <View style={styles.occupancyBar}>
+                        <View
+                            style={[
+                                styles.occupancyFill,
+                                {
+                                    width: `${stats.totalRooms > 0
+                                        ? (stats.occupiedRooms / stats.totalRooms * 100)
+                                        : 0}%`
+                                }
+                            ]}
+                        />
                     </View>
-
-                    <View style={styles.infoCard}>
-                        <View style={[styles.infoIcon, { backgroundColor: '#dcfce7' }]}>
-                            <Ionicons name="person" size={24} color="#22c55e" />
-                        </View>
-                        <View style={styles.infoText}>
-                            <Text style={styles.infoValue}>{stats.todayRentals}</Text>
-                            <Text style={styles.infoLabel}>lượt thuê</Text>
-                        </View>
-                    </View>
+                    <Text style={styles.occupancyText}>
+                        {stats.totalRooms > 0
+                            ? Math.round(stats.occupiedRooms / stats.totalRooms * 100)
+                            : 0}% phòng đang được sử dụng
+                    </Text>
                 </View>
             </ScrollView>
         </View>
@@ -169,6 +258,15 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f8fafc',
+    },
+    centerContent: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#64748b',
     },
     header: {
         paddingTop: 50,
@@ -187,6 +285,17 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.15)',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    refreshButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    rotating: {
+        // Animation sẽ được thêm vào nếu cần
     },
     headerTitle: {
         fontSize: 20,
@@ -225,6 +334,40 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         textAlign: 'center',
     },
+    summaryContainer: {
+        flexDirection: 'row',
+        padding: 16,
+        paddingTop: 0,
+        gap: 12,
+    },
+    summaryCard: {
+        flex: 1,
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        alignItems: 'center',
+        gap: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    summaryText: {
+        flex: 1,
+    },
+    summaryValue: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1e293b',
+        marginBottom: 2,
+    },
+    summaryLabel: {
+        fontSize: 12,
+        color: '#64748b',
+        fontWeight: '500',
+    },
     chartContainer: {
         backgroundColor: '#fff',
         margin: 16,
@@ -260,7 +403,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     barContainer: {
-        height: 180,
+        height: 150,
         width: 60,
         justifyContent: 'flex-end',
         alignItems: 'center',
@@ -275,8 +418,14 @@ const styles = StyleSheet.create({
         flex: 1,
         width: '100%',
     },
-    chartLabel: {
+    barValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1e293b',
         marginTop: 8,
+    },
+    chartLabel: {
+        marginTop: 4,
         fontSize: 12,
         color: '#64748b',
         fontWeight: '600',
@@ -285,7 +434,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 0,
         top: 60,
-        height: 180,
+        height: 150,
         justifyContent: 'space-between',
         paddingVertical: 10,
     },
@@ -294,46 +443,39 @@ const styles = StyleSheet.create({
         color: '#94a3b8',
         fontWeight: '600',
     },
-    bottomInfo: {
-        flexDirection: 'row',
-        padding: 16,
-        paddingTop: 0,
-        gap: 12,
-    },
-    infoCard: {
-        flex: 1,
-        flexDirection: 'row',
+    occupancyContainer: {
         backgroundColor: '#fff',
+        margin: 16,
+        marginTop: 0,
         borderRadius: 16,
-        padding: 16,
-        alignItems: 'center',
-        gap: 12,
+        padding: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2,
     },
-    infoIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: '#dbeafe',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    infoText: {
-        flex: 1,
-    },
-    infoValue: {
+    sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: '#1e293b',
-        marginBottom: 2,
+        marginBottom: 16,
     },
-    infoLabel: {
-        fontSize: 12,
+    occupancyBar: {
+        height: 12,
+        backgroundColor: '#e2e8f0',
+        borderRadius: 6,
+        overflow: 'hidden',
+    },
+    occupancyFill: {
+        height: '100%',
+        backgroundColor: '#3b82f6',
+        borderRadius: 6,
+    },
+    occupancyText: {
+        marginTop: 8,
+        fontSize: 14,
         color: '#64748b',
-        fontWeight: '500',
+        textAlign: 'center',
     },
 });
