@@ -14,6 +14,7 @@ import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 
+import ChangePasswordModal from '@/components/ChangePasswordModal';
 import EditProfileModal from '@/components/EditProfileModal';
 import authService from '../../services/authService';
 
@@ -23,6 +24,7 @@ export default function ProfileScreen() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -63,6 +65,25 @@ export default function ProfileScreen() {
     setShowEditModal(false);
   };
 
+  const handleChangePasswordSuccess = async () => {
+    setShowChangePasswordModal(false);
+
+    // Đăng xuất và chuyển về trang login
+    await authService.logout();
+
+    Alert.alert(
+      'Thành công',
+      'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
+      [
+        {
+          text: 'Đăng nhập',
+          onPress: () => router.replace('/(auth)/login'),
+        },
+      ],
+      { cancelable: false } // Không cho phép đóng alert bằng cách tap ra ngoài
+    );
+  };
+
   const menuItems = [
     {
       icon: 'person-outline',
@@ -75,7 +96,7 @@ export default function ProfileScreen() {
       icon: 'lock-closed-outline',
       title: 'Đổi mật khẩu',
       subtitle: 'Thay đổi mật khẩu đăng nhập',
-      onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển'),
+      onPress: () => setShowChangePasswordModal(true),
       badge: null,
     },
     {
@@ -170,16 +191,6 @@ export default function ProfileScreen() {
               <Text style={styles.userRole}>{user.role || 'USER'}</Text>
             </View>
           </View>
-
-
-
-          <TouchableOpacity
-            style={styles.editProfileButton}
-            onPress={() => setShowEditModal(true)}
-          >
-            <Ionicons name="create-outline" size={18} color="#4a90e2" />
-            <Text style={styles.editProfileText}>Chỉnh sửa thông tin</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.menuSection}>
@@ -232,6 +243,12 @@ export default function ProfileScreen() {
         user={user}
         onClose={() => setShowEditModal(false)}
         onSuccess={handleUpdateSuccess}
+      />
+
+      <ChangePasswordModal
+        visible={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        onSuccess={handleChangePasswordSuccess}
       />
     </View>
   );
@@ -359,43 +376,6 @@ const styles = StyleSheet.create({
     color: '#4a90e2',
     fontWeight: '700',
     textTransform: 'uppercase',
-  },
-
-  userDetails: {
-    width: '100%',
-    gap: 8,
-    marginBottom: 16,
-  },
-
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 6,
-  },
-
-  detailText: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-
-  editProfileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-
-  editProfileText: {
-    fontSize: 14,
-    color: '#4a90e2',
-    fontWeight: '700',
   },
 
   sectionTitle: {

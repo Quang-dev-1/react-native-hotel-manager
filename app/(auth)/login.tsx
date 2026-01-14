@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -15,7 +14,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import authService from '../../services/authService';
 
@@ -76,21 +75,31 @@ export default function LoginScreen() {
     }
   };
 
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleLogin = async () => {
+    // Reset errors
+    setEmailError('');
+    setPasswordError('');
+
     let hasError = false;
 
+    // Validate email
     if (!email.trim()) {
-      setEmailError('Please enter your email');
+      setEmailError('Vui lòng nhập email');
       hasError = true;
-    } else {
-      setEmailError('');
+    } else if (!validateEmail(email.trim())) {
+      setEmailError('Email không đúng định dạng');
+      hasError = true;
     }
 
+    // Validate password
     if (!password.trim()) {
-      setPasswordError('Please enter your password');
+      setPasswordError('Vui lòng nhập mật khẩu');
       hasError = true;
-    } else {
-      setPasswordError('');
     }
 
     if (hasError) return;
@@ -106,16 +115,23 @@ export default function LoginScreen() {
       // Lưu thông tin đăng nhập nếu thành công
       await saveCredentials();
 
-      Alert.alert('Success', 'Login successful!', [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/(drawer)/dashboard'),
-        },
-      ]);
+      // Chuyển trang không cần Alert
+      router.replace('/(drawer)/dashboard');
     } catch (error: any) {
-      const errorMessage = error.message || 'Login failed. Please try again.';
-      setEmailError(errorMessage);
-      setPasswordError(errorMessage);
+      console.error('Login error:', error);
+
+      // Xử lý lỗi chi tiết
+      const errorMessage = error.message || '';
+
+      if (errorMessage.includes('email') || errorMessage.includes('Email')) {
+        setEmailError('Email không tồn tại trong hệ thống');
+      } else if (errorMessage.includes('password') || errorMessage.includes('Password') || errorMessage.includes('Invalid')) {
+        setPasswordError('Mật khẩu không chính xác');
+      } else {
+        // Lỗi chung
+        setEmailError(errorMessage || 'Đăng nhập thất bại');
+        setPasswordError(errorMessage || 'Vui lòng kiểm tra lại thông tin');
+      }
     } finally {
       setLoading(false);
     }
@@ -155,8 +171,8 @@ export default function LoginScreen() {
               style={styles.logo}
               source={require('../../assets/images/HotelManager.png')}
             />
-            <Text style={styles.title}>Login Account</Text>
-            <Text style={styles.subtitle}>Sign in to your account</Text>
+            <Text style={styles.title}>Đăng Nhập</Text>
+            <Text style={styles.subtitle}>Chào mừng bạn trở lại</Text>
           </View>
 
           <View style={styles.form}>
@@ -190,7 +206,7 @@ export default function LoginScreen() {
                 <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Password"
+                  placeholder="Mật khẩu"
                   value={password}
                   onChangeText={(text) => {
                     setPassword(text);
@@ -221,13 +237,13 @@ export default function LoginScreen() {
                 <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
                   {rememberMe && <View style={styles.checkDot} />}
                 </View>
-                <Text style={styles.rememberTxt}>Remember me</Text>
+                <Text style={styles.rememberTxt}>Ghi nhớ đăng nhập</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => router.push('/(auth)/ForgotPasswordScreen')}
                 disabled={loading}>
-                <Text style={styles.forgot}>Forgot Password?</Text>
+                <Text style={styles.forgot}>Quên mật khẩu?</Text>
               </TouchableOpacity>
             </View>
 
@@ -240,7 +256,7 @@ export default function LoginScreen() {
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <>
-                    <Text style={styles.btnTxt}>Sign In</Text>
+                    <Text style={styles.btnTxt}>Đăng Nhập</Text>
                     <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
                   </>
                 )}
@@ -249,7 +265,7 @@ export default function LoginScreen() {
 
             <View style={styles.divider}>
               <View style={styles.line} />
-              <Text style={styles.dividerTxt}>OR</Text>
+              <Text style={styles.dividerTxt}>HOẶC</Text>
               <View style={styles.line} />
             </View>
 
@@ -266,11 +282,11 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.signup}>
-              <Text style={styles.signupTxt}>Don`t have an account? </Text>
+              <Text style={styles.signupTxt}>Chưa có tài khoản? </Text>
               <TouchableOpacity
                 onPress={() => router.push('/(auth)/register')}
                 disabled={loading}>
-                <Text style={styles.signupLink}>Sign Up</Text>
+                <Text style={styles.signupLink}>Đăng Ký</Text>
               </TouchableOpacity>
             </View>
 
@@ -333,6 +349,7 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: '#ef4444',
     borderWidth: 2,
+    backgroundColor: '#fef2f2',
   },
   textInput: {
     flex: 1,
@@ -350,7 +367,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 13,
     color: '#ef4444',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   row: {
     flexDirection: 'row',

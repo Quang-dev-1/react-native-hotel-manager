@@ -13,6 +13,11 @@ export interface RegisterRequest {
   password: string;
 }
 
+export interface ChangePasswordRequest {
+  oldPassword: string;
+  newPassword: string;
+}
+
 export interface AuthResponse {
   token: string;
   email?: string;
@@ -105,12 +110,23 @@ class AuthService {
 
   async updateProfile(userId: number, data: { fullName: string; phone: string }): Promise<User> {
     try {
+      console.log('🔄 Updating profile for user:', userId, data);
       const response = await apiClient.put<User>(`/users/${userId}`, data);
+      console.log('✅ Update profile response:', response.data);
 
       const currentUser = await this.getCurrentUser();
-      const updatedUser = { ...currentUser, ...response.data };
 
+      const updatedUser: User = {
+        id: currentUser?.id || userId,
+        email: currentUser?.email || response.data.email || '',
+        role: currentUser?.role || response.data.role || 'USER',
+        fullName: data.fullName,
+        phone: data.phone,
+      };
+
+      console.log('💾 Saving updated user data:', updatedUser);
       await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+      console.log('✅ User data updated successfully');
 
       return updatedUser;
     } catch (error: any) {
@@ -118,6 +134,43 @@ class AuthService {
       throw new Error(error.response?.data?.message || 'Không thể cập nhật thông tin');
     }
   }
+
+  async changePassword(data: ChangePasswordRequest): Promise<void> {
+    try {
+      console.log('🔐 Change password request');
+      const currentUser = await this.getCurrentUser();
+
+      if (!currentUser?.email) {
+        throw new Error('Không tìm thấy thông tin người dùng');
+      }
+
+      // Gọi API đổi mật khẩu - Endpoint: POST /api/auth/change-password
+      const response = await apiClient.post('/auth/change-password', {
+        email: currentUser.email,
+        oldPassword: data.oldPassword,
+        newPassword: data.newPassword,
+      });
+
+      console.log('✅ Password changed successfully:', response.data);
+    } catch (error: any) {
+      console.error('❌ Change password error:', error.response?.data || error.message);
+
+      if (error.response?.status === 400) {
+        throw new Error('Mật khẩu cũ không chính xác');
+      }
+      if (error.response?.status === 401) {
+        throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại');
+      }
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      throw new Error('Không thể đổi mật khẩu. Vui lòng thử lại');
+    }
+  }
+
   async logout(): Promise<void> {
     try {
       await AsyncStorage.removeItem('authToken');

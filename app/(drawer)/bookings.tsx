@@ -490,11 +490,6 @@ export default function BookingsScreen() {
                         <Ionicons name="menu" size={28} color="#fff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Lịch đặt phòng</Text>
-                    <TouchableOpacity
-                        style={styles.menuButton}
-                        onPress={() => navigation.navigate('AllBookingsScreen')}>
-                        <Ionicons name="list" size={24} color="#fff" />
-                    </TouchableOpacity>
                 </View>
             </LinearGradient>
 

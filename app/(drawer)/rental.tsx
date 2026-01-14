@@ -720,7 +720,7 @@ export default function RentalScreen() {
                             onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
                             <Ionicons name="menu" size={28} color="#fff" />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Quản lý đặt phòng</Text>
+                        <Text style={styles.headerTitle}>Phòng đang thuê</Text>
                     </View>
                 </LinearGradient>
                 <View style={styles.loadingContainer}>
@@ -744,7 +744,7 @@ export default function RentalScreen() {
                         onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
                         <Ionicons name="menu" size={28} color="#fff" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Quản lý đặt phòng</Text>
+                    <Text style={styles.headerTitle}>Phòng đang thuê</Text>
                 </View>
             </LinearGradient>
 
