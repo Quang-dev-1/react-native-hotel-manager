@@ -21,7 +21,7 @@ export interface RoomType {
 
 class RoomService {
   // ============ ROOM APIs ============
-  
+
   async getRooms(): Promise<Room[]> {
     try {
       console.log('📋 Fetching all rooms...');
@@ -113,7 +113,7 @@ class RoomService {
   }
 
   // ============ ROOM TYPE APIs ============
-  
+
   async getRoomTypes(): Promise<RoomType[]> {
     try {
       console.log('📋 Fetching all room types...');

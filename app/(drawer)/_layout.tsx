@@ -1,10 +1,11 @@
-// app/(drawer)/_layout.tsx
 import { BookingProvider } from '@/contexts/BookingContext';
 import { RoomProvider } from '@/contexts/RoomContext';
+import AuthService from '@/services/authService';
 import { Ionicons } from '@expo/vector-icons';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -20,15 +21,50 @@ import ProfileScreen from '../(drawer)/profile';
 import RentalScreen from '../(drawer)/rental';
 import FinanceScreen from './finance';
 import LogsScreen from './logs';
+import ServicesScreen from './services';
 import SystemScreen from './system';
 import WarehouseScreen from './warehouse';
 
 const Drawer = createDrawerNavigator();
 
 function CustomDrawerContent() {
-  const user = {
-    name: 'thienquynhfff',
-    avatar: require('../../assets/images/HotelManager.png')
+  const [userEmail, setUserEmail] = useState<string>('Đang tải...');
+
+  useEffect(() => {
+    loadUserEmail();
+  }, []);
+
+  const loadUserEmail = async () => {
+    try {
+      const userData = await AuthService.getCurrentUser();
+      if (userData?.email) {
+        setUserEmail(userData.email);
+      } else {
+        setUserEmail('Khách');
+      }
+    } catch (error) {
+      console.error('Error loading user email:', error);
+      setUserEmail('Khách');
+    }
+  };
+
+  const handleLogout = async () => {
+    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Đăng xuất',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await AuthService.logout();
+            router.replace('/(auth)/login');
+          } catch (error) {
+            console.error('Logout error:', error);
+            Alert.alert('Lỗi', 'Đăng xuất không thành công');
+          }
+        },
+      },
+    ]);
   };
 
   const menuItems = [
@@ -54,25 +90,25 @@ function CustomDrawerContent() {
       name: 'Quản lý kho',
       icon: 'cube-outline',
       screen: 'warehouse',
-      component: DashboardScreen,
+      component: WarehouseScreen,
     },
     {
       name: 'Quản lý thu chi',
       icon: 'card-outline',
       screen: 'finance',
-      component: DashboardScreen,
+      component: FinanceScreen,
     },
     {
       name: 'Quản lý hệ thống',
       icon: 'settings-outline',
       screen: 'system',
-      component: DashboardScreen,
+      component: SystemScreen,
     },
     {
       name: 'Nhật ký hệ thống',
       icon: 'time-outline',
       screen: 'logs',
-      component: DashboardScreen,
+      component: LogsScreen,
     },
     {
       name: 'Tài khoản',
@@ -82,17 +118,6 @@ function CustomDrawerContent() {
     },
   ];
 
-  const handleLogout = () => {
-    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất?', [
-      { text: 'Hủy', style: 'cancel' },
-      {
-        text: 'Đăng xuất',
-        style: 'destructive',
-        onPress: () => router.replace('/(auth)/login'),
-      },
-    ]);
-  };
-
   return (
     <LinearGradient
       colors={['#5da9e9', '#4a90e2']}
@@ -101,15 +126,17 @@ function CustomDrawerContent() {
       <View style={styles.profileSection}>
         <View style={styles.hotelIconWrapper}>
           <Image
-            source={user.avatar}
+            source={require('../../assets/images/HotelManager.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
         </View>
-        <TouchableOpacity style={styles.userInfo}>
-          <Text style={styles.userName}>{user.name}</Text>
-          <Ionicons name="swap-horizontal" size={20} color="#dbeafe" />
-        </TouchableOpacity>
+        <View style={styles.userInfo}>
+          <Text style={styles.userEmail}>{userEmail}</Text>
+          <TouchableOpacity onPress={() => router.push('/(drawer)/profile')}>
+            <Ionicons name="swap-horizontal" size={20} color="#dbeafe" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Menu Items */}
@@ -168,6 +195,7 @@ export default function DrawerLayout() {
           <Drawer.Screen name="finance" component={FinanceScreen} />
           <Drawer.Screen name="system" component={SystemScreen} />
           <Drawer.Screen name="logs" component={LogsScreen} />
+          <Drawer.Screen name="services" component={ServicesScreen} />
         </Drawer.Navigator>
       </BookingProvider>
     </RoomProvider>
@@ -202,12 +230,13 @@ const styles = StyleSheet.create({
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
   },
-  userName: {
-    fontSize: 18,
-    fontWeight: '600',
+  userEmail: {
+    fontSize: 16,
+    fontWeight: '500',
     color: '#fff',
+    flex: 1,
   },
   menuContainer: {
     flex: 1,

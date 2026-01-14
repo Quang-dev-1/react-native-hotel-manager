@@ -3,7 +3,7 @@ import { Room } from '@/services/roomService';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -21,13 +21,15 @@ const CalendarPicker = ({
     onClose,
     onSelect,
     selectedDate,
-    minDate
+    minDate,
+    bookedDates = []
 }: {
     visible: boolean;
     onClose: () => void;
     onSelect: (date: Date) => void;
     selectedDate: Date;
     minDate?: Date;
+    bookedDates?: string[];
 }) => {
     const [currentMonth, setCurrentMonth] = useState(selectedDate.getMonth());
     const [currentYear, setCurrentYear] = useState(selectedDate.getFullYear());
@@ -66,7 +68,15 @@ const CalendarPicker = ({
     const isDateDisabled = (day: number) => {
         if (!minDate) return false;
         const date = new Date(currentYear, currentMonth, day);
-        return date < minDate;
+        date.setHours(0, 0, 0, 0);
+        const min = new Date(minDate);
+        min.setHours(0, 0, 0, 0);
+        return date < min;
+    };
+
+    const isDateBooked = (day: number) => {
+        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        return bookedDates.includes(dateStr);
     };
 
     const isToday = (day: number) => {
@@ -93,6 +103,7 @@ const CalendarPicker = ({
 
         for (let day = 1; day <= daysInMonth; day++) {
             const disabled = isDateDisabled(day);
+            const booked = isDateBooked(day);
             const today = isToday(day);
             const selected = isSelected(day);
 
@@ -103,21 +114,24 @@ const CalendarPicker = ({
                         styles.calendarDay,
                         today && styles.calendarDayToday,
                         selected && styles.calendarDaySelected,
-                        disabled && styles.calendarDayDisabled,
+                        (disabled || booked) && styles.calendarDayDisabled,
+                        booked && !selected && styles.calendarDayBooked,
                     ]}
                     onPress={() => {
-                        if (!disabled) {
+                        if (!disabled && !booked) {
                             const newDate = new Date(currentYear, currentMonth, day);
+                            newDate.setHours(12, 0, 0, 0);
                             onSelect(newDate);
                             onClose();
                         }
                     }}
-                    disabled={disabled}>
+                    disabled={disabled || booked}>
                     <Text style={[
                         styles.calendarDayText,
                         today && styles.calendarDayTextToday,
                         selected && styles.calendarDayTextSelected,
-                        disabled && styles.calendarDayTextDisabled,
+                        (disabled || booked) && styles.calendarDayTextDisabled,
+                        booked && !selected && styles.calendarDayTextBooked,
                     ]}>
                         {day}
                     </Text>
@@ -158,6 +172,15 @@ const CalendarPicker = ({
                         {renderCalendar()}
                     </View>
 
+                    {bookedDates.length > 0 && (
+                        <View style={styles.calendarLegend}>
+                            <View style={styles.legendItem}>
+                                <View style={[styles.legendBox, { backgroundColor: '#fecaca' }]} />
+                                <Text style={styles.legendText}>Đã có booking</Text>
+                            </View>
+                        </View>
+                    )}
+
                     <TouchableOpacity
                         style={styles.calendarCloseButton}
                         onPress={onClose}>
@@ -172,17 +195,28 @@ const CalendarPicker = ({
 export default function BookingFormScreen() {
     const navigation = useNavigation();
     const route = useRoute();
-    const { room } = route.params as { room: Room };
+
+    const params = route.params as { room?: Room; preselectedCheckIn?: string } | undefined;
+    const room = params?.room;
+    const preselectedCheckIn = params?.preselectedCheckIn;
+
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     const [customerName, setCustomerName] = useState('');
     const [phone, setPhone] = useState('');
-    const [checkInDate, setCheckInDate] = useState(new Date());
-    const [checkOutDate, setCheckOutDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const [checkInDate, setCheckInDate] = useState(
+        preselectedCheckIn ? new Date(preselectedCheckIn + 'T12:00:00') : today
+    );
+    const [checkOutDate, setCheckOutDate] = useState(tomorrow);
     const [showCheckInPicker, setShowCheckInPicker] = useState(false);
     const [showCheckOutPicker, setShowCheckOutPicker] = useState(false);
     const [deposit, setDeposit] = useState('');
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
+    const [bookedDates, setBookedDates] = useState<string[]>([]);
 
     const [errors, setErrors] = useState({
         customerName: '',
@@ -190,34 +224,53 @@ export default function BookingFormScreen() {
         deposit: '',
     });
 
+    useEffect(() => {
+        if (!room) {
+            Alert.alert(
+                'Lỗi',
+                'Không tìm thấy thông tin phòng. Vui lòng thử lại.',
+                [{ text: 'OK', onPress: () => navigation.goBack() }]
+            );
+        } else {
+            loadBookedDates();
+        }
+    }, [room, navigation]);
+
+    const loadBookedDates = async () => {
+        if (!room?.id) return;
+        try {
+            const dates = await bookingService.getBookedDatesByRoom(room.id);
+            setBookedDates(dates);
+        } catch (error) {
+            console.error('Error loading booked dates:', error);
+        }
+    };
+
+    if (!room) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#4a90e2" />
+                <Text style={{ marginTop: 16, color: '#64748b' }}>Đang tải...</Text>
+            </View>
+        );
+    }
+
     const validatePhone = (text: string) => {
         const phoneRegex = /^[0-9]{10,11}$/;
-        if (!text.trim()) {
-            return 'Vui lòng nhập số điện thoại';
-        }
-        if (!phoneRegex.test(text.trim())) {
-            return 'Số điện thoại không hợp lệ (10-11 chữ số)';
-        }
+        if (!text.trim()) return 'Vui lòng nhập số điện thoại';
+        if (!phoneRegex.test(text.trim())) return 'Số điện thoại không hợp lệ (10-11 chữ số)';
         return '';
     };
 
     const validateCustomerName = (text: string) => {
-        if (!text.trim()) {
-            return 'Vui lòng nhập tên khách hàng';
-        }
-        if (text.trim().length < 2) {
-            return 'Tên khách hàng phải có ít nhất 2 ký tự';
-        }
+        if (!text.trim()) return 'Vui lòng nhập tên khách hàng';
+        if (text.trim().length < 2) return 'Tên khách hàng phải có ít nhất 2 ký tự';
         return '';
     };
 
     const validateDeposit = (text: string) => {
-        if (text && isNaN(Number(text))) {
-            return 'Tiền cọc phải là số';
-        }
-        if (text && Number(text) < 0) {
-            return 'Tiền cọc không thể âm';
-        }
+        if (text && isNaN(Number(text))) return 'Tiền cọc phải là số';
+        if (text && Number(text) < 0) return 'Tiền cọc không thể âm';
         return '';
     };
 
@@ -252,8 +305,16 @@ export default function BookingFormScreen() {
 
     const handleCheckInDateSelect = (date: Date) => {
         setCheckInDate(date);
-        if (date >= checkOutDate) {
-            setCheckOutDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
+        const currentCheckOut = new Date(checkOutDate);
+        currentCheckOut.setHours(12, 0, 0, 0);
+        const selectedCheckIn = new Date(date);
+        selectedCheckIn.setHours(12, 0, 0, 0);
+
+        if (selectedCheckIn >= currentCheckOut) {
+            const newCheckOut = new Date(date);
+            newCheckOut.setDate(newCheckOut.getDate() + 1);
+            newCheckOut.setHours(12, 0, 0, 0);
+            setCheckOutDate(newCheckOut);
         }
     };
 
@@ -262,12 +323,31 @@ export default function BookingFormScreen() {
     };
 
     const calculateNights = () => {
-        const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+        const checkIn = new Date(checkInDate);
+        checkIn.setHours(0, 0, 0, 0);
+        const checkOut = new Date(checkOutDate);
+        checkOut.setHours(0, 0, 0, 0);
+        const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
         return nights > 0 ? nights : 0;
     };
 
     const calculateTotal = () => {
         return room.price * calculateNights();
+    };
+
+    // Kiểm tra xem khoảng thời gian có trùng với booking đã có không
+    const checkDateOverlap = (checkIn: string, checkOut: string): boolean => {
+        const checkInDate = new Date(checkIn);
+        const checkOutDate = new Date(checkOut);
+
+        // Tạo array các ngày trong khoảng checkin -> checkout
+        const datesInRange: string[] = [];
+        for (let d = new Date(checkInDate); d < checkOutDate; d.setDate(d.getDate() + 1)) {
+            datesInRange.push(d.toISOString().split('T')[0]);
+        }
+
+        // Kiểm tra xem có ngày nào trùng với bookedDates không
+        return datesInRange.some(date => bookedDates.includes(date));
     };
 
     const handleSubmitBooking = async () => {
@@ -288,11 +368,40 @@ export default function BookingFormScreen() {
 
         const nights = calculateNights();
         if (nights <= 0) {
-            Alert.alert('Lỗi', 'Ngày trả phòng phải sau ngày nhận phòng');
+            Alert.alert('Lỗi', 'Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 ngày');
+            return;
+        }
+
+        const todayDate = new Date();
+        todayDate.setHours(0, 0, 0, 0);
+        const checkIn = new Date(checkInDate);
+        checkIn.setHours(0, 0, 0, 0);
+
+        if (checkIn < todayDate) {
+            Alert.alert('Lỗi', 'Ngày nhận phòng không thể là ngày trong quá khứ');
+            return;
+        }
+
+        // Kiểm tra trùng ngày
+        const checkInStr = formatDateForAPI(checkInDate);
+        const checkOutStr = formatDateForAPI(checkOutDate);
+
+        if (checkDateOverlap(checkInStr, checkOutStr)) {
+            Alert.alert(
+                'Không thể đặt phòng',
+                'Khoảng thời gian bạn chọn trùng với booking đã có. Vui lòng chọn ngày khác.',
+                [{ text: 'OK' }]
+            );
             return;
         }
 
         const depositAmount = deposit ? parseFloat(deposit) : 0;
+        const totalAmount = calculateTotal();
+
+        if (depositAmount > totalAmount) {
+            Alert.alert('Lỗi', 'Tiền cọc không thể lớn hơn tổng tiền phòng');
+            return;
+        }
 
         try {
             setLoading(true);
@@ -301,29 +410,44 @@ export default function BookingFormScreen() {
                 roomId: room.id!,
                 customerName: customerName.trim(),
                 phone: phone.trim(),
-                checkIn: formatDateForAPI(checkInDate),
-                checkOut: formatDateForAPI(checkOutDate),
+                checkIn: checkInStr,
+                checkOut: checkOutStr,
                 deposit: depositAmount,
                 notes: notes.trim(),
             };
 
+            console.log('📤 Submitting booking:', bookingData);
+
             await bookingService.createBooking(bookingData);
+
+            // Kiểm tra xem có booking đang active không để thông báo cho user
+            const activeBookings = await bookingService.getActiveBookings();
+            const hasActiveBooking = activeBookings.some(
+                b => b.roomId === room.id && b.status === 'CHECKED_IN'
+            );
+
+            const statusMessage = hasActiveBooking
+                ? 'Booking đã được tạo với trạng thái CHỜ XÁC NHẬN.\n\nLưu ý: Phòng này đang có khách đang ở. Bạn chỉ có thể xác nhận booking này sau khi khách hiện tại trả phòng.'
+                : 'Booking đã được tạo thành công!';
 
             Alert.alert(
                 'Thành công',
-                `Đã đặt phòng ${room.roomNumber} thành công!`,
-                [
-                    {
-                        text: 'OK',
-                        onPress: () => navigation.goBack()
-                    }
-                ]
+                `${statusMessage}\n\nThông tin:\n• Số đêm: ${nights} đêm\n• Tổng tiền: ${totalAmount.toLocaleString('vi-VN')}đ\n• Đặt cọc: ${depositAmount.toLocaleString('vi-VN')}đ`,
+                [{ text: 'OK', onPress: () => navigation.goBack() }]
             );
         } catch (error: any) {
-            Alert.alert('Lỗi', error.message || 'Không thể tạo đặt phòng');
+            console.error('❌ Booking error:', error);
+            Alert.alert('Lỗi', error.message || 'Không thể tạo đặt phòng. Vui lòng thử lại.');
         } finally {
             setLoading(false);
         }
+    };
+
+    const getMinCheckOutDate = () => {
+        const minDate = new Date(checkInDate);
+        minDate.setDate(minDate.getDate() + 1);
+        minDate.setHours(0, 0, 0, 0);
+        return minDate;
     };
 
     return (
@@ -358,10 +482,7 @@ export default function BookingFormScreen() {
                     <Text style={styles.inputLabel}>
                         Tên khách hàng <Text style={styles.required}>*</Text>
                     </Text>
-                    <View style={[
-                        styles.inputWrapper,
-                        errors.customerName ? styles.inputError : null
-                    ]}>
+                    <View style={[styles.inputWrapper, errors.customerName ? styles.inputError : null]}>
                         <Ionicons name="person-outline" size={20} color="#64748b" />
                         <TextInput
                             style={styles.input}
@@ -372,19 +493,14 @@ export default function BookingFormScreen() {
                             editable={!loading}
                         />
                     </View>
-                    {errors.customerName ? (
-                        <Text style={styles.errorText}>{errors.customerName}</Text>
-                    ) : null}
+                    {errors.customerName ? <Text style={styles.errorText}>{errors.customerName}</Text> : null}
                 </View>
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>
                         Số điện thoại <Text style={styles.required}>*</Text>
                     </Text>
-                    <View style={[
-                        styles.inputWrapper,
-                        errors.phone ? styles.inputError : null
-                    ]}>
+                    <View style={[styles.inputWrapper, errors.phone ? styles.inputError : null]}>
                         <Ionicons name="call-outline" size={20} color="#64748b" />
                         <TextInput
                             style={styles.input}
@@ -397,9 +513,7 @@ export default function BookingFormScreen() {
                             editable={!loading}
                         />
                     </View>
-                    {errors.phone ? (
-                        <Text style={styles.errorText}>{errors.phone}</Text>
-                    ) : null}
+                    {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -437,20 +551,19 @@ export default function BookingFormScreen() {
                             <Text style={styles.summaryValue}>{calculateNights()} đêm</Text>
                         </View>
                         <View style={styles.summaryRow}>
-                            <Text style={styles.summaryLabel}>Tổng tiền:</Text>
-                            <Text style={styles.summaryValueHighlight}>
-                                {calculateTotal().toLocaleString('vi-VN')}đ
-                            </Text>
+                            <Text style={styles.summaryLabel}>Giá mỗi đêm:</Text>
+                            <Text style={styles.summaryValue}>{room.price.toLocaleString('vi-VN')}đ</Text>
+                        </View>
+                        <View style={[styles.summaryRow, styles.summaryRowTotal]}>
+                            <Text style={styles.summaryLabelTotal}>Tổng tiền:</Text>
+                            <Text style={styles.summaryValueHighlight}>{calculateTotal().toLocaleString('vi-VN')}đ</Text>
                         </View>
                     </View>
                 )}
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Tiền trả trước (đặt cọc)</Text>
-                    <View style={[
-                        styles.inputWrapper,
-                        errors.deposit ? styles.inputError : null
-                    ]}>
+                    <View style={[styles.inputWrapper, errors.deposit ? styles.inputError : null]}>
                         <Ionicons name="cash-outline" size={20} color="#64748b" />
                         <TextInput
                             style={styles.input}
@@ -463,9 +576,7 @@ export default function BookingFormScreen() {
                         />
                         <Text style={styles.currency}>đ</Text>
                     </View>
-                    {errors.deposit ? (
-                        <Text style={styles.errorText}>{errors.deposit}</Text>
-                    ) : null}
+                    {errors.deposit ? <Text style={styles.errorText}>{errors.deposit}</Text> : null}
                 </View>
 
                 <View style={styles.roomInfoCard}>
@@ -483,9 +594,7 @@ export default function BookingFormScreen() {
                             <Ionicons name="cash-outline" size={20} color="#4a90e2" />
                             <Text style={styles.roomInfoLabel}>Giá phòng</Text>
                         </View>
-                        <Text style={styles.roomInfoValue}>
-                            {room.price.toLocaleString('vi-VN')}đ/đêm
-                        </Text>
+                        <Text style={styles.roomInfoValue}>{room.price.toLocaleString('vi-VN')}đ/đêm</Text>
                     </View>
                     <View style={styles.roomInfoRow}>
                         <View style={styles.roomInfoItem}>
@@ -550,6 +659,7 @@ export default function BookingFormScreen() {
                 onSelect={handleCheckInDateSelect}
                 selectedDate={checkInDate}
                 minDate={new Date()}
+                bookedDates={bookedDates}
             />
 
             <CalendarPicker
@@ -557,7 +667,8 @@ export default function BookingFormScreen() {
                 onClose={() => setShowCheckOutPicker(false)}
                 onSelect={handleCheckOutDateSelect}
                 selectedDate={checkOutDate}
-                minDate={new Date(checkInDate.getTime() + 24 * 60 * 60 * 1000)}
+                minDate={getMinCheckOutDate()}
+                bookedDates={bookedDates}
             />
         </View>
     );
@@ -566,18 +677,18 @@ export default function BookingFormScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#f8fafc'
     },
     header: {
         paddingTop: 50,
         paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingBottom: 20
     },
     headerTop: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 16,
-        marginBottom: 16,
+        marginBottom: 16
     },
     backButton: {
         width: 44,
@@ -585,13 +696,13 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         backgroundColor: 'rgba(255, 255, 255, 0.15)',
         justifyContent: 'center',
-        alignItems: 'center',
+        alignItems: 'center'
     },
     headerTitle: {
         fontSize: 20,
         fontWeight: '700',
         color: '#fff',
-        flex: 1,
+        flex: 1
     },
     roomBadge: {
         flexDirection: 'row',
@@ -600,30 +711,30 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.15)',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderRadius: 12,
+        borderRadius: 12
     },
     roomBadgeText: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#fff',
+        color: '#fff'
     },
     formContainer: {
-        flex: 1,
+        flex: 1
     },
     formContent: {
-        padding: 20,
+        padding: 20
     },
     inputGroup: {
-        marginBottom: 20,
+        marginBottom: 20
     },
     inputLabel: {
         fontSize: 14,
         fontWeight: '600',
         color: '#1e293b',
-        marginBottom: 8,
+        marginBottom: 8
     },
     required: {
-        color: '#ef4444',
+        color: '#ef4444'
     },
     inputWrapper: {
         flexDirection: 'row',
@@ -633,24 +744,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         borderWidth: 1,
         borderColor: '#e2e8f0',
-        gap: 12,
+        gap: 12
     },
     inputError: {
         borderColor: '#ef4444',
-        borderWidth: 1.5,
+        borderWidth: 1.5
     },
     input: {
         flex: 1,
         fontSize: 15,
         color: '#1e293b',
         paddingVertical: 14,
-        fontWeight: '500',
+        fontWeight: '500'
     },
     errorText: {
         fontSize: 12,
         color: '#ef4444',
         marginTop: 4,
-        marginLeft: 4,
+        marginLeft: 4
     },
     dateButton: {
         flexDirection: 'row',
@@ -661,18 +772,18 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderWidth: 1,
         borderColor: '#e2e8f0',
-        gap: 12,
+        gap: 12
     },
     dateText: {
         flex: 1,
         fontSize: 15,
         color: '#1e293b',
-        fontWeight: '500',
+        fontWeight: '500'
     },
     currency: {
         fontSize: 14,
         color: '#64748b',
-        fontWeight: '600',
+        fontWeight: '600'
     },
     summaryCard: {
         backgroundColor: '#eff6ff',
@@ -680,36 +791,48 @@ const styles = StyleSheet.create({
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#bfdbfe',
+        borderColor: '#bfdbfe'
     },
     summaryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 8
+    },
+    summaryRowTotal: {
+        marginTop: 8,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#bfdbfe',
+        marginBottom: 0
     },
     summaryLabel: {
         fontSize: 14,
         color: '#475569',
-        fontWeight: '500',
+        fontWeight: '500'
+    },
+    summaryLabelTotal: {
+        fontSize: 15,
+        color: '#1e293b',
+        fontWeight: '700'
     },
     summaryValue: {
         fontSize: 14,
         color: '#1e293b',
-        fontWeight: '700',
+        fontWeight: '700'
     },
     summaryValueHighlight: {
-        fontSize: 16,
+        fontSize: 18,
         color: '#4a90e2',
-        fontWeight: '700',
+        fontWeight: '700'
     },
     textAreaWrapper: {
         alignItems: 'flex-start',
-        paddingVertical: 12,
+        paddingVertical: 12
     },
     textArea: {
         minHeight: 100,
-        textAlignVertical: 'top',
+        textAlignVertical: 'top'
     },
     roomInfoCard: {
         backgroundColor: '#fff',
@@ -720,42 +843,42 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
-        elevation: 2,
+        elevation: 2
     },
     roomInfoTitle: {
         fontSize: 16,
         fontWeight: '700',
         color: '#1e293b',
-        marginBottom: 12,
+        marginBottom: 12
     },
     divider: {
         height: 1,
         backgroundColor: '#e2e8f0',
-        marginBottom: 16,
+        marginBottom: 16
     },
     roomInfoRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 12
     },
     roomInfoItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 8
     },
     roomInfoLabel: {
         fontSize: 14,
         color: '#64748b',
-        fontWeight: '500',
+        fontWeight: '500'
     },
     roomInfoValue: {
         fontSize: 14,
         color: '#1e293b',
-        fontWeight: '700',
+        fontWeight: '700'
     },
     bottomSpace: {
-        height: 20,
+        height: 20
     },
     footer: {
         flexDirection: 'row',
@@ -768,7 +891,7 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: -2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
-        elevation: 4,
+        elevation: 4
     },
     cancelBtn: {
         flex: 1,
@@ -777,40 +900,39 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8fafc',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#e2e8f0',
+        borderColor: '#e2e8f0'
     },
     cancelBtnText: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#64748b',
+        color: '#64748b'
     },
     submitBtnDisabled: {
-        opacity: 0.7,
+        opacity: 0.7
     },
     submitBtn: {
         flex: 2,
         borderRadius: 12,
-        overflow: 'hidden',
+        overflow: 'hidden'
     },
     submitBtnGradient: {
         flexDirection: 'row',
         paddingVertical: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        gap: 8
     },
     submitBtnText: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#fff',
+        color: '#fff'
     },
-    // Calendar Styles
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
+        padding: 20
     },
     calendarContainer: {
         backgroundColor: '#fff',
@@ -822,13 +944,13 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
         shadowRadius: 12,
-        elevation: 8,
+        elevation: 8
     },
     calendarHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 20
     },
     calendarNavButton: {
         width: 40,
@@ -836,16 +958,16 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderRadius: 10,
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#f8fafc'
     },
     calendarTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1e293b',
+        color: '#1e293b'
     },
     calendarWeekdays: {
         flexDirection: 'row',
-        marginBottom: 10,
+        marginBottom: 10
     },
     calendarWeekday: {
         flex: 1,
@@ -853,45 +975,73 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: '#64748b',
-        paddingVertical: 8,
+        paddingVertical: 8
     },
     calendarDays: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
+        flexWrap: 'wrap'
     },
     calendarDay: {
         width: '14.28%',
         aspectRatio: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 4,
+        padding: 4
     },
     calendarDayToday: {
         backgroundColor: '#e0f2fe',
-        borderRadius: 8,
+        borderRadius: 8
     },
     calendarDaySelected: {
         backgroundColor: '#4a90e2',
-        borderRadius: 8,
+        borderRadius: 8
     },
     calendarDayDisabled: {
-        opacity: 0.3,
+        opacity: 0.3
+    },
+    calendarDayBooked: {
+        backgroundColor: '#fecaca',
+        borderRadius: 8
     },
     calendarDayText: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#1e293b',
+        color: '#1e293b'
     },
     calendarDayTextToday: {
         color: '#0369a1',
-        fontWeight: '700',
+        fontWeight: '700'
     },
     calendarDayTextSelected: {
         color: '#fff',
-        fontWeight: '700',
+        fontWeight: '700'
     },
     calendarDayTextDisabled: {
-        color: '#94a3b8',
+        color: '#94a3b8'
+    },
+    calendarDayTextBooked: {
+        color: '#991b1b',
+        fontWeight: '600'
+    },
+    calendarLegend: {
+        marginTop: 15,
+        paddingTop: 15,
+        borderTopWidth: 1,
+        borderTopColor: '#e2e8f0'
+    },
+    legendItem: {
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+    legendBox: {
+        width: 16,
+        height: 16,
+        borderRadius: 4,
+        marginRight: 8
+    },
+    legendText: {
+        fontSize: 13,
+        color: '#64748b'
     },
     calendarCloseButton: {
         marginTop: 20,
@@ -900,11 +1050,11 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#e2e8f0',
+        borderColor: '#e2e8f0'
     },
     calendarCloseButtonText: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#64748b',
+        color: '#64748b'
     },
 });

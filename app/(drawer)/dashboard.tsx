@@ -17,6 +17,11 @@ import {
 
 const screenWidth = Dimensions.get('window').width;
 
+interface ChartData {
+    date: string;
+    value: number;
+}
+
 export default function DashboardScreen() {
     const navigation = useNavigation<any>();
     const [stats, setStats] = useState<DashboardStats>({
@@ -27,6 +32,7 @@ export default function DashboardScreen() {
         totalRooms: 0,
         availableRooms: 0,
     });
+    const [chartData, setChartData] = useState<ChartData[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -36,6 +42,9 @@ export default function DashboardScreen() {
             const data = await BookingService.getDashboardStats();
             setStats(data);
             console.log('✅ Dashboard stats loaded:', data);
+
+            // Lấy dữ liệu lượt thuê để hiển thị biểu đồ
+            await loadRentalChart();
         } catch (error: any) {
             console.error('❌ Load dashboard stats error:', error);
             Alert.alert(
@@ -49,9 +58,64 @@ export default function DashboardScreen() {
         }
     };
 
+    const loadRentalChart = async () => {
+        try {
+            console.log('📈 Loading rental chart data...');
+
+            // Lấy tất cả bookings
+            const allBookings = await BookingService.getAllBookings();
+
+            // Tính toán lượt thuê hôm qua và hôm nay
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayStr = today.toISOString().split('T')[0];
+
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+            // Đếm số booking được tạo trong ngày
+            const todayRentals = allBookings.filter(b => {
+                if (!b.createdAt) return false;
+                const createdDate = new Date(b.createdAt);
+                createdDate.setHours(0, 0, 0, 0);
+                return createdDate.toISOString().split('T')[0] === todayStr;
+            }).length;
+
+            const yesterdayRentals = allBookings.filter(b => {
+                if (!b.createdAt) return false;
+                const createdDate = new Date(b.createdAt);
+                createdDate.setHours(0, 0, 0, 0);
+                return createdDate.toISOString().split('T')[0] === yesterdayStr;
+            }).length;
+
+            const chartData: ChartData[] = [
+                {
+                    date: `${yesterday.getDate()}/${yesterday.getMonth() + 1}`,
+                    value: yesterdayRentals
+                },
+                {
+                    date: `${today.getDate()}/${today.getMonth() + 1}`,
+                    value: todayRentals
+                },
+            ];
+
+            setChartData(chartData);
+            console.log('✅ Chart data loaded:', chartData);
+        } catch (error) {
+            console.error('❌ Load chart data error:', error);
+            // Fallback to default data
+            setChartData([
+                { date: 'Hôm qua', value: 0 },
+                { date: 'Hôm nay', value: stats.todayRentals },
+            ]);
+        }
+    };
+
     useEffect(() => {
         loadDashboardStats();
 
+        // Auto refresh every 30 seconds
         const interval = setInterval(() => {
             loadDashboardStats();
         }, 30000);
@@ -71,42 +135,38 @@ export default function DashboardScreen() {
             value: stats.todayRentals,
             color: ['#93c5fd', '#3b82f6'],
             bgColor: '#dbeafe',
-            filter: 'today'
+            filter: 'all'
+        },
+        {
+            icon: 'time-outline',
+            label: 'Phòng chờ',
+            value: stats.waitingRooms,
+            color: ['#fde68a', '#f59e0b'],
+            bgColor: '#fef3c7',
+            filter: 'PENDING'
         },
         {
             icon: 'bed-outline',
-            label: 'Phòng chờ',
-            value: stats.waitingRooms,
-            color: ['#86efac', '#22c55e'],
-            bgColor: '#dcfce7',
-            filter: 'waiting'
-        },
-        {
-            icon: 'location-outline',
             label: 'Phòng đang thuê',
             value: stats.occupiedRooms,
-            color: ['#fde68a', '#f59e0b'],
-            bgColor: '#fef3c7',
-            filter: 'occupied'
+            color: ['#86efac', '#22c55e'],
+            bgColor: '#dcfce7',
+            filter: 'CHECKED_IN'
         },
         {
             icon: 'brush-outline',
             label: 'Phòng cần dọn',
             value: stats.cleaningRooms,
-            color: ['#ddd6fe', '#8b5cf6'],
-            bgColor: '#ede9fe',
-            filter: 'cleaning'
+            color: ['#fce7f3', '#ec4899'],
+            bgColor: '#fce7f3',
+            filter: 'CHECKED_OUT'
         },
-    ];
-
-    const chartData = [
-        { date: 'Hôm qua', value: 0 },
-        { date: 'Hôm nay', value: stats.todayRentals },
     ];
 
     const maxValue = Math.max(...chartData.map(d => d.value), 1);
 
     const handleCardPress = (filter: string) => {
+        console.log('🔵 Navigating to rental with filter:', filter);
         navigation.dispatch(DrawerActions.closeDrawer());
         navigation.navigate('rental', { filter });
     };
@@ -295,7 +355,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     rotating: {
-        // Animation sẽ được thêm vào nếu cần
+        // Animation có thể thêm sau
     },
     headerTitle: {
         fontSize: 20,

@@ -1,8 +1,11 @@
+import historyService, { HistoryRecord } from '@/services/historyService';
 import { Ionicons } from '@expo/vector-icons';
-import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -11,142 +14,99 @@ import {
     View,
 } from 'react-native';
 
-interface LogEntry {
-    id: number;
-    type: 'info' | 'warning' | 'error' | 'success';
-    action: string;
-    user: string;
-    description: string;
-    timestamp: string;
-    details?: string;
-}
-
 export default function LogsScreen() {
-    const navigation = useNavigation();
+    const navigation = useNavigation<any>();
+    const [history, setHistory] = useState<HistoryRecord[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedType, setSelectedType] = useState<string>('all');
 
-    // Mock data
-    const [logs] = useState<LogEntry[]>([
-        {
-            id: 1,
-            type: 'success',
-            action: 'Đặt phòng',
-            user: 'Admin',
-            description: 'Đã đặt phòng 102 cho khách Nguyễn Văn A',
-            timestamp: '17/12/2025 14:35:20',
-            details: 'Phòng 102, 3 đêm, tổng tiền 1,500,000đ',
-        },
-        {
-            id: 2,
-            type: 'success',
-            action: 'Trả phòng',
-            user: 'Admin',
-            description: 'Khách đã trả phòng 201',
-            timestamp: '17/12/2025 12:15:45',
-            details: 'Thanh toán đầy đủ, phòng chuyển sang trạng thái dọn dẹp',
-        },
-        {
-            id: 3,
-            type: 'warning',
-            action: 'Cảnh báo kho',
-            user: 'System',
-            description: 'Khăn tắm sắp hết (còn 45/50)',
-            timestamp: '17/12/2025 10:00:00',
-            details: 'Cần nhập thêm khăn tắm',
-        },
-        {
-            id: 4,
-            type: 'info',
-            action: 'Cập nhật kho',
-            user: 'Admin',
-            description: 'Đã nhập 100 chai dầu gội',
-            timestamp: '16/12/2025 16:20:30',
-            details: 'Tổng số lượng hiện tại: 180 chai',
-        },
-        {
-            id: 5,
-            type: 'error',
-            action: 'Thanh toán thất bại',
-            user: 'System',
-            description: 'Lỗi kết nối cổng thanh toán',
-            timestamp: '16/12/2025 15:45:12',
-            details: 'Mã lỗi: PAYMENT_GATEWAY_ERROR',
-        },
-        {
-            id: 6,
-            type: 'success',
-            action: 'Đăng nhập',
-            user: 'Admin',
-            description: 'Đăng nhập thành công',
-            timestamp: '16/12/2025 08:30:00',
-        },
-        {
-            id: 7,
-            type: 'info',
-            action: 'Sao lưu dữ liệu',
-            user: 'System',
-            description: 'Đã tự động sao lưu dữ liệu',
-            timestamp: '16/12/2025 00:00:00',
-            details: 'Backup size: 125 MB',
-        },
-        {
-            id: 8,
-            type: 'warning',
-            action: 'Phòng cần bảo trì',
-            user: 'System',
-            description: 'Phòng 305 báo cáo sự cố điều hòa',
-            timestamp: '15/12/2025 18:20:00',
-            details: 'Cần kiểm tra hệ thống điều hòa',
-        },
-        {
-            id: 9,
-            type: 'success',
-            action: 'Hủy đặt phòng',
-            user: 'Admin',
-            description: 'Đã hủy đặt phòng 104',
-            timestamp: '15/12/2025 14:10:25',
-            details: 'Hoàn tiền cọc cho khách',
-        },
-        {
-            id: 10,
-            type: 'info',
-            action: 'Cập nhật giá',
-            user: 'Admin',
-            description: 'Cập nhật giá phòng Suite',
-            timestamp: '15/12/2025 09:00:00',
-            details: 'Giá mới: 1,200,000đ/đêm',
-        },
-    ]);
-
-    const logTypes = [
-        { key: 'all', label: 'Tất cả', icon: 'list-outline', color: '#64748b' },
-        { key: 'success', label: 'Thành công', icon: 'checkmark-circle', color: '#22c55e' },
-        { key: 'info', label: 'Thông tin', icon: 'information-circle', color: '#3b82f6' },
-        { key: 'warning', label: 'Cảnh báo', icon: 'warning', color: '#f59e0b' },
-        { key: 'error', label: 'Lỗi', icon: 'close-circle', color: '#ef4444' },
-    ];
-
-    const getLogTypeInfo = (type: string) => {
-        return logTypes.find(t => t.key === type) || logTypes[0];
+    const fetchHistory = async () => {
+        try {
+            setLoading(true);
+            const data = await historyService.getAllHistory();
+            // Sắp xếp theo ngày tạo mới nhất
+            const sortedData = data.sort((a, b) => {
+                const dateA = new Date(a.createdAt || a.actualCheckOut);
+                const dateB = new Date(b.createdAt || b.actualCheckOut);
+                return dateB.getTime() - dateA.getTime();
+            });
+            setHistory(sortedData);
+        } catch (error: any) {
+            Alert.alert('Lỗi', error.message || 'Không thể tải lịch sử');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const filteredLogs = logs.filter(log => {
-        const matchesSearch =
-            log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            log.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            log.user.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesType = selectedType === 'all' || log.type === selectedType;
-        return matchesSearch && matchesType;
-    });
+    useFocusEffect(
+        useCallback(() => {
+            fetchHistory();
+        }, [])
+    );
 
-    const stats = {
-        total: logs.length,
-        success: logs.filter(l => l.type === 'success').length,
-        info: logs.filter(l => l.type === 'info').length,
-        warning: logs.filter(l => l.type === 'warning').length,
-        error: logs.filter(l => l.type === 'error').length,
+    const filteredHistory = history.filter(record =>
+        record.roomNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.phone.includes(searchQuery)
+    );
+
+    const handleDelete = async (id: number) => {
+        Alert.alert(
+            'Xóa lịch sử',
+            'Bạn có chắc muốn xóa bản ghi này khỏi lịch sử?',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Xóa',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await historyService.deleteHistory(id);
+                            Alert.alert('Thành công', 'Đã xóa lịch sử');
+                            fetchHistory();
+                        } catch (error: any) {
+                            Alert.alert('Lỗi', error.message);
+                        }
+                    },
+                },
+            ]
+        );
     };
+
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('vi-VN');
+    };
+
+    const formatDateTime = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toLocaleString('vi-VN');
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.container}>
+                <LinearGradient
+                    colors={['#4a90e2', '#357abd']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.header}>
+                    <View style={styles.headerTop}>
+                        <TouchableOpacity
+                            style={styles.menuButton}
+                            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+                            <Ionicons name="menu" size={28} color="#fff" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>Lịch sử</Text>
+                    </View>
+                </LinearGradient>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#4a90e2" />
+                    <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -161,158 +121,152 @@ export default function LogsScreen() {
                         onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
                         <Ionicons name="menu" size={28} color="#fff" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Nhật ký hệ thống</Text>
+                    <Text style={styles.headerTitle}>Lịch sử</Text>
                 </View>
             </LinearGradient>
 
-            {/* Stats Bar */}
-            <View style={styles.statsBar}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.statsContent}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{stats.total}</Text>
-                        <Text style={styles.statLabel}>Tổng</Text>
-                    </View>
-                    <View style={[styles.statItem, { borderLeftColor: '#22c55e' }]}>
-                        <Text style={[styles.statValue, { color: '#22c55e' }]}>
-                            {stats.success}
-                        </Text>
-                        <Text style={styles.statLabel}>Thành công</Text>
-                    </View>
-                    <View style={[styles.statItem, { borderLeftColor: '#3b82f6' }]}>
-                        <Text style={[styles.statValue, { color: '#3b82f6' }]}>
-                            {stats.info}
-                        </Text>
-                        <Text style={styles.statLabel}>Thông tin</Text>
-                    </View>
-                    <View style={[styles.statItem, { borderLeftColor: '#f59e0b' }]}>
-                        <Text style={[styles.statValue, { color: '#f59e0b' }]}>
-                            {stats.warning}
-                        </Text>
-                        <Text style={styles.statLabel}>Cảnh báo</Text>
-                    </View>
-                    <View style={[styles.statItem, { borderLeftColor: '#ef4444' }]}>
-                        <Text style={[styles.statValue, { color: '#ef4444' }]}>
-                            {stats.error}
-                        </Text>
-                        <Text style={styles.statLabel}>Lỗi</Text>
-                    </View>
-                </ScrollView>
-            </View>
-
-            {/* Search and Filter */}
             <View style={styles.searchSection}>
                 <View style={styles.searchBar}>
                     <Ionicons name="search" size={20} color="#64748b" />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Tìm kiếm nhật ký..."
+                        placeholder="Tìm theo phòng, khách hàng, SĐT..."
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholderTextColor="#94a3b8"
                     />
-                </View>
-
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.filtersScroll}
-                    contentContainerStyle={styles.filtersContent}>
-                    {logTypes.map((type) => (
-                        <TouchableOpacity
-                            key={type.key}
-                            style={[
-                                styles.filterChip,
-                                selectedType === type.key && [
-                                    styles.filterChipActive,
-                                    { backgroundColor: type.color },
-                                ],
-                            ]}
-                            onPress={() => setSelectedType(type.key)}>
-                            <Ionicons
-                                name={type.icon as any}
-                                size={18}
-                                color={selectedType === type.key ? '#fff' : type.color}
-                            />
-                            <Text
-                                style={[
-                                    styles.filterText,
-                                    selectedType === type.key && styles.filterTextActive,
-                                ]}>
-                                {type.label}
-                            </Text>
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                            <Ionicons name="close-circle" size={20} color="#94a3b8" />
                         </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-
-            {/* Logs List */}
-            <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.logsList}>
-                    <Text style={styles.resultsText}>
-                        {filteredLogs.length} nhật ký
-                    </Text>
-
-                    {filteredLogs.map((log) => {
-                        const typeInfo = getLogTypeInfo(log.type);
-                        return (
-                            <View key={log.id} style={styles.logCard}>
-                                <View
-                                    style={[
-                                        styles.logIndicator,
-                                        { backgroundColor: typeInfo.color },
-                                    ]}
-                                />
-                                <View style={styles.logContent}>
-                                    <View style={styles.logHeader}>
-                                        <View
-                                            style={[
-                                                styles.logIcon,
-                                                { backgroundColor: `${typeInfo.color}20` },
-                                            ]}>
-                                            <Ionicons
-                                                name={typeInfo.icon as any}
-                                                size={20}
-                                                color={typeInfo.color}
-                                            />
-                                        </View>
-                                        <View style={styles.logHeaderText}>
-                                            <Text style={styles.logAction}>{log.action}</Text>
-                                            <View style={styles.logMeta}>
-                                                <Ionicons name="person-outline" size={14} color="#94a3b8" />
-                                                <Text style={styles.logUser}>{log.user}</Text>
-                                                <Text style={styles.logDot}>•</Text>
-                                                <Ionicons name="time-outline" size={14} color="#94a3b8" />
-                                                <Text style={styles.logTime}>{log.timestamp}</Text>
-                                            </View>
-                                        </View>
-                                    </View>
-
-                                    <Text style={styles.logDescription}>{log.description}</Text>
-
-                                    {log.details && (
-                                        <View style={styles.logDetails}>
-                                            <Ionicons name="document-text-outline" size={14} color="#94a3b8" />
-                                            <Text style={styles.logDetailsText}>{log.details}</Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </View>
-                        );
-                    })}
-
-                    {filteredLogs.length === 0 && (
-                        <View style={styles.emptyState}>
-                            <Ionicons name="search-outline" size={64} color="#cbd5e1" />
-                            <Text style={styles.emptyTitle}>Không tìm thấy nhật ký</Text>
-                            <Text style={styles.emptySubtitle}>
-                                Thử tìm kiếm với từ khóa khác
-                            </Text>
-                        </View>
                     )}
                 </View>
+            </View>
+
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.content}>
+                <View style={styles.statsCard}>
+                    <View style={styles.statItem}>
+                        <Ionicons name="receipt-outline" size={32} color="#4a90e2" />
+                        <Text style={styles.statNumber}>{history.length}</Text>
+                        <Text style={styles.statLabel}>Tổng bản ghi</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                        <Ionicons name="cash-outline" size={32} color="#22c55e" />
+                        <Text style={styles.statNumber}>
+                            {history.reduce((sum, h) => sum + h.totalAmount, 0).toLocaleString('vi-VN')}đ
+                        </Text>
+                        <Text style={styles.statLabel}>Tổng doanh thu</Text>
+                    </View>
+                </View>
+
+                <View style={styles.headerRow}>
+                    <Text style={styles.headerText}>
+                        {filteredHistory.length} bản ghi
+                    </Text>
+                </View>
+
+                {filteredHistory.map(record => (
+                    <View key={record.id} style={styles.historyCard}>
+                        <View style={styles.cardHeader}>
+                            <View style={styles.cardHeaderLeft}>
+                                <View style={styles.roomBadge}>
+                                    <Ionicons name="bed" size={16} color="#4a90e2" />
+                                    <Text style={styles.roomBadgeText}>
+                                        Phòng {record.roomNumber}
+                                    </Text>
+                                </View>
+                                <View style={styles.dateBadge}>
+                                    <Ionicons name="calendar-outline" size={12} color="#64748b" />
+                                    <Text style={styles.dateText}>
+                                        {formatDate(record.actualCheckOut)}
+                                    </Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.deleteButton}
+                                onPress={() => handleDelete(record.id!)}>
+                                <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.cardBody}>
+                            <View style={styles.infoRow}>
+                                <Ionicons name="person-outline" size={16} color="#64748b" />
+                                <Text style={styles.infoText}>{record.customerName}</Text>
+                            </View>
+                            <View style={styles.infoRow}>
+                                <Ionicons name="call-outline" size={16} color="#64748b" />
+                                <Text style={styles.infoText}>{record.phone}</Text>
+                            </View>
+                            <View style={styles.infoRow}>
+                                <Ionicons name="time-outline" size={16} color="#64748b" />
+                                <Text style={styles.infoText}>
+                                    {formatDate(record.checkIn)} → {formatDate(record.checkOut)}
+                                    {' '}({record.nights} đêm)
+                                </Text>
+                            </View>
+                            {record.notes && (
+                                <View style={styles.infoRow}>
+                                    <Ionicons name="document-text-outline" size={16} color="#64748b" />
+                                    <Text style={styles.infoText}>{record.notes}</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.cardFooter}>
+                            <View style={styles.amountRow}>
+                                <Text style={styles.amountLabel}>Tiền phòng:</Text>
+                                <Text style={styles.amountValue}>
+                                    {record.roomAmount.toLocaleString('vi-VN')}đ
+                                </Text>
+                            </View>
+                            {record.serviceAmount > 0 && (
+                                <View style={styles.amountRow}>
+                                    <Text style={styles.amountLabel}>Dịch vụ:</Text>
+                                    <Text style={styles.amountValue}>
+                                        {record.serviceAmount.toLocaleString('vi-VN')}đ
+                                    </Text>
+                                </View>
+                            )}
+                            <View style={styles.amountRow}>
+                                <Text style={styles.amountLabel}>Đã đặt cọc:</Text>
+                                <Text style={styles.amountValue}>
+                                    {record.deposit.toLocaleString('vi-VN')}đ
+                                </Text>
+                            </View>
+                            <View style={styles.totalRow}>
+                                <Text style={styles.totalLabel}>Tổng thanh toán:</Text>
+                                <Text style={styles.totalValue}>
+                                    {record.totalAmount.toLocaleString('vi-VN')}đ
+                                </Text>
+                            </View>
+                        </View>
+
+                        {record.createdAt && (
+                            <View style={styles.timestampRow}>
+                                <Ionicons name="time-outline" size={12} color="#94a3b8" />
+                                <Text style={styles.timestampText}>
+                                    Lưu lúc: {formatDateTime(record.createdAt)}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                ))}
+
+                {filteredHistory.length === 0 && (
+                    <View style={styles.emptyState}>
+                        <Ionicons name="document-text-outline" size={64} color="#cbd5e1" />
+                        <Text style={styles.emptyTitle}>Chưa có lịch sử</Text>
+                        <Text style={styles.emptySubtitle}>
+                            {searchQuery
+                                ? 'Không tìm thấy kết quả phù hợp'
+                                : 'Lịch sử sẽ được lưu khi khách trả phòng'}
+                        </Text>
+                    </View>
+                )}
             </ScrollView>
         </View>
     );
@@ -326,7 +280,7 @@ const styles = StyleSheet.create({
     header: {
         paddingTop: 50,
         paddingHorizontal: 20,
-        paddingBottom: 16,
+        paddingBottom: 20,
     },
     headerTop: {
         flexDirection: 'row',
@@ -347,31 +301,15 @@ const styles = StyleSheet.create({
         color: '#fff',
         flex: 1,
     },
-    statsBar: {
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 32,
     },
-    statsContent: {
-        flexDirection: 'row',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-    },
-    statItem: {
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-        borderLeftWidth: 3,
-        borderLeftColor: '#4a90e2',
-        marginRight: 16,
-    },
-    statValue: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: 2,
-    },
-    statLabel: {
-        fontSize: 12,
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
         color: '#64748b',
         fontWeight: '500',
     },
@@ -390,7 +328,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         height: 48,
         gap: 12,
-        marginBottom: 12,
     },
     searchInput: {
         flex: 1,
@@ -398,124 +335,179 @@ const styles = StyleSheet.create({
         color: '#1e293b',
         fontWeight: '500',
     },
-    filtersScroll: {
-        marginHorizontal: -16,
-    },
-    filtersContent: {
-        paddingHorizontal: 16,
-        gap: 8,
-    },
-    filterChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#f8fafc',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        marginRight: 8,
-    },
-    filterChipActive: {
-        borderColor: 'transparent',
-    },
-    filterText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#64748b',
-    },
-    filterTextActive: {
-        color: '#fff',
-    },
-    logsList: {
+    content: {
         padding: 16,
     },
-    resultsText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#64748b',
-        marginBottom: 12,
-    },
-    logCard: {
+    statsCard: {
         flexDirection: 'row',
         backgroundColor: '#fff',
-        borderRadius: 12,
-        marginBottom: 12,
-        overflow: 'hidden',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    logIndicator: {
-        width: 4,
-    },
-    logContent: {
+    statItem: {
         flex: 1,
-        padding: 16,
-    },
-    logHeader: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 8,
-        gap: 12,
-    },
-    logIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        justifyContent: 'center',
         alignItems: 'center',
     },
-    logHeaderText: {
-        flex: 1,
+    statDivider: {
+        width: 1,
+        backgroundColor: '#e2e8f0',
+        marginHorizontal: 16,
     },
-    logAction: {
+    statNumber: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1e293b',
+        marginTop: 8,
+        marginBottom: 4,
+    },
+    statLabel: {
+        fontSize: 12,
+        color: '#64748b',
+        fontWeight: '500',
+    },
+    headerRow: {
+        marginBottom: 16,
+    },
+    headerText: {
         fontSize: 16,
         fontWeight: '700',
         color: '#1e293b',
-        marginBottom: 4,
     },
-    logMeta: {
+    historyCard: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        marginBottom: 12,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#f8fafc',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+    },
+    cardHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flex: 1,
+    },
+    roomBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#eff6ff',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    roomBadgeText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#4a90e2',
+    },
+    dateBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+        backgroundColor: '#f1f5f9',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
     },
-    logUser: {
-        fontSize: 12,
+    dateText: {
+        fontSize: 11,
+        fontWeight: '600',
         color: '#64748b',
-        fontWeight: '500',
     },
-    logDot: {
-        fontSize: 12,
-        color: '#cbd5e1',
-        marginHorizontal: 4,
-    },
-    logTime: {
-        fontSize: 12,
-        color: '#64748b',
-        fontWeight: '500',
-    },
-    logDescription: {
-        fontSize: 14,
-        color: '#475569',
-        lineHeight: 20,
-        marginBottom: 8,
-    },
-    logDetails: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: 6,
-        backgroundColor: '#f8fafc',
-        padding: 10,
+    deleteButton: {
+        width: 32,
+        height: 32,
         borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fee2e2',
     },
-    logDetailsText: {
+    cardBody: {
+        padding: 12,
+        gap: 8,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    infoText: {
+        fontSize: 14,
+        color: '#64748b',
+        fontWeight: '500',
         flex: 1,
+    },
+    cardFooter: {
+        padding: 12,
+        backgroundColor: '#f8fafc',
+        borderTopWidth: 1,
+        borderTopColor: '#e2e8f0',
+        gap: 6,
+    },
+    amountRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    amountLabel: {
         fontSize: 13,
         color: '#64748b',
+        fontWeight: '500',
+    },
+    amountValue: {
+        fontSize: 14,
+        color: '#1e293b',
+        fontWeight: '600',
+    },
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 8,
+        marginTop: 6,
+        borderTopWidth: 1,
+        borderTopColor: '#e2e8f0',
+    },
+    totalLabel: {
+        fontSize: 14,
+        color: '#1e293b',
+        fontWeight: '700',
+    },
+    totalValue: {
+        fontSize: 16,
+        color: '#4a90e2',
+        fontWeight: '700',
+    },
+    timestampRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: '#fafbfc',
+    },
+    timestampText: {
+        fontSize: 11,
+        color: '#94a3b8',
         fontWeight: '500',
     },
     emptyState: {
@@ -533,5 +525,6 @@ const styles = StyleSheet.create({
     emptySubtitle: {
         fontSize: 14,
         color: '#64748b',
+        textAlign: 'center',
     },
 });

@@ -58,14 +58,14 @@ class AuthService {
       console.log('🔐 Login request:', { email: data.email, password: '***' });
       const response = await apiClient.post<AuthResponse>('/auth/login', data);
       console.log('✅ Login response:', response.data);
-      
+
       if (response.data.token) {
         await AsyncStorage.setItem('authToken', response.data.token);
         console.log('💾 Token saved');
-        
+
         // Xử lý user data từ response
         let userData: User;
-        
+
         if (response.data.user) {
           // Format 1: Backend trả về { token, user: {...} }
           userData = response.data.user;
@@ -76,11 +76,11 @@ class AuthService {
             role: response.data.role || 'USER',
           };
         }
-        
+
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
         console.log('💾 User data saved:', userData);
       }
-      
+
       return response.data;
     } catch (error: any) {
       console.error('❌ Login error details:', {
@@ -89,7 +89,7 @@ class AuthService {
         data: error.response?.data,
         message: error.message,
       });
-      
+
       if (error.response?.status === 500) {
         throw new Error('Server error. Please check if user exists and credentials are correct.');
       }
@@ -103,6 +103,21 @@ class AuthService {
     }
   }
 
+  async updateProfile(userId: number, data: { fullName: string; phone: string }): Promise<User> {
+    try {
+      const response = await apiClient.put<User>(`/users/${userId}`, data);
+
+      const currentUser = await this.getCurrentUser();
+      const updatedUser = { ...currentUser, ...response.data };
+
+      await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+
+      return updatedUser;
+    } catch (error: any) {
+      console.error('❌ Update profile error:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || 'Không thể cập nhật thông tin');
+    }
+  }
   async logout(): Promise<void> {
     try {
       await AsyncStorage.removeItem('authToken');

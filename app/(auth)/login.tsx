@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +19,12 @@ import {
 } from 'react-native';
 import authService from '../../services/authService';
 
+const STORAGE_KEYS = {
+  REMEMBER_ME: '@remember_me',
+  SAVED_EMAIL: '@saved_email',
+  SAVED_PASSWORD: '@saved_password',
+};
+
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,6 +34,47 @@ export default function LoginScreen() {
 
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
+  // Load saved credentials khi component mount
+  useEffect(() => {
+    loadSavedCredentials();
+  }, []);
+
+  const loadSavedCredentials = async () => {
+    try {
+      const savedRememberMe = await AsyncStorage.getItem(STORAGE_KEYS.REMEMBER_ME);
+
+      if (savedRememberMe === 'true') {
+        const savedEmail = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_EMAIL);
+        const savedPassword = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_PASSWORD);
+
+        if (savedEmail) setEmail(savedEmail);
+        if (savedPassword) setPassword(savedPassword);
+        setRememberMe(true);
+      }
+    } catch (error) {
+      console.error('Error loading saved credentials:', error);
+    }
+  };
+
+  const saveCredentials = async () => {
+    try {
+      if (rememberMe) {
+        await AsyncStorage.setItem(STORAGE_KEYS.REMEMBER_ME, 'true');
+        await AsyncStorage.setItem(STORAGE_KEYS.SAVED_EMAIL, email.trim());
+        await AsyncStorage.setItem(STORAGE_KEYS.SAVED_PASSWORD, password);
+      } else {
+        // Xóa thông tin đã lưu nếu không chọn remember me
+        await AsyncStorage.multiRemove([
+          STORAGE_KEYS.REMEMBER_ME,
+          STORAGE_KEYS.SAVED_EMAIL,
+          STORAGE_KEYS.SAVED_PASSWORD,
+        ]);
+      }
+    } catch (error) {
+      console.error('Error saving credentials:', error);
+    }
+  };
 
   const handleLogin = async () => {
     let hasError = false;
@@ -55,6 +103,9 @@ export default function LoginScreen() {
         password: password,
       });
 
+      // Lưu thông tin đăng nhập nếu thành công
+      await saveCredentials();
+
       Alert.alert('Success', 'Login successful!', [
         {
           text: 'OK',
@@ -67,6 +118,24 @@ export default function LoginScreen() {
       setPasswordError(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRememberMeToggle = async () => {
+    const newValue = !rememberMe;
+    setRememberMe(newValue);
+
+    // Nếu bỏ chọn remember me, xóa thông tin đã lưu ngay lập tức
+    if (!newValue) {
+      try {
+        await AsyncStorage.multiRemove([
+          STORAGE_KEYS.REMEMBER_ME,
+          STORAGE_KEYS.SAVED_EMAIL,
+          STORAGE_KEYS.SAVED_PASSWORD,
+        ]);
+      } catch (error) {
+        console.error('Error removing saved credentials:', error);
+      }
     }
   };
 
@@ -147,7 +216,7 @@ export default function LoginScreen() {
             <View style={styles.row}>
               <TouchableOpacity
                 style={styles.remember}
-                onPress={() => setRememberMe(!rememberMe)}
+                onPress={handleRememberMeToggle}
                 disabled={loading}>
                 <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
                   {rememberMe && <View style={styles.checkDot} />}

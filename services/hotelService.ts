@@ -9,9 +9,19 @@ export interface HotelService {
   available: boolean;
 }
 
+export interface BookingServiceItem {
+  id?: number;
+  bookingId: number;
+  serviceId: number;
+  serviceName?: string;
+  quantity: number;
+  price: number;
+  totalPrice: number;
+}
+
 class HotelServiceAPI {
   // ============ SERVICE APIs ============
-  
+
   async getAllServices(): Promise<HotelService[]> {
     try {
       console.log('📋 Fetching all services...');
@@ -66,6 +76,50 @@ class HotelServiceAPI {
         throw new Error(error.response.data.message);
       }
       throw new Error('Không thể thêm dịch vụ');
+    }
+  }
+
+  // Thêm dịch vụ vào booking và cập nhật tổng tiền
+  async addServiceToBooking(bookingId: number, serviceId: number, quantity: number): Promise<BookingServiceItem> {
+    try {
+      console.log(`➕ Adding service to booking ${bookingId}:`, { serviceId, quantity });
+      const response = await apiClient.post<BookingServiceItem>(
+        `/bookings/${bookingId}/services`,
+        null,
+        {
+          params: { serviceId, quantity }
+        }
+      );
+      console.log('✅ Service added to booking:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Add service to booking error:', error);
+      throw new Error(error.response?.data?.message || 'Không thể thêm dịch vụ vào booking');
+    }
+  }
+
+  // Lấy danh sách dịch vụ của một booking
+  async getBookingServices(bookingId: number): Promise<BookingServiceItem[]> {
+    try {
+      console.log(`📋 Fetching services for booking ${bookingId}...`);
+      const response = await apiClient.get<BookingServiceItem[]>(`/bookings/${bookingId}/services`);
+      console.log('✅ Booking services fetched:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Get booking services error:', error);
+      throw new Error(error.response?.data?.message || 'Không thể lấy danh sách dịch vụ');
+    }
+  }
+
+  // Xóa dịch vụ khỏi booking
+  async removeServiceFromBooking(bookingId: number, serviceItemId: number): Promise<void> {
+    try {
+      console.log(`🗑️ Removing service ${serviceItemId} from booking ${bookingId}...`);
+      await apiClient.delete(`/bookings/${bookingId}/services/${serviceItemId}`);
+      console.log('✅ Service removed from booking');
+    } catch (error: any) {
+      console.error('❌ Remove service from booking error:', error);
+      throw new Error(error.response?.data?.message || 'Không thể xóa dịch vụ');
     }
   }
 
