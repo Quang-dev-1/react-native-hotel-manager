@@ -1,4 +1,5 @@
 import BookingService, { DashboardStats } from '@/services/bookingService';
+import financeService, { FinanceSummary } from '@/services/financeService';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,15 +36,16 @@ export default function DashboardScreen() {
     const [chartData, setChartData] = useState<ChartData[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
 
     const loadDashboardStats = async () => {
         try {
             console.log('📊 Loading dashboard stats...');
             const data = await BookingService.getDashboardStats();
             setStats(data);
-            console.log('✅ Dashboard stats loaded:', data);
+            const summary = await financeService.getFinanceSummary('month');
+            setFinanceSummary(summary);
 
-            // Lấy dữ liệu lượt thuê để hiển thị biểu đồ
             await loadRentalChart();
         } catch (error: any) {
             console.error('❌ Load dashboard stats error:', error);
@@ -62,10 +64,8 @@ export default function DashboardScreen() {
         try {
             console.log('📈 Loading rental chart data...');
 
-            // Lấy tất cả bookings
             const allBookings = await BookingService.getAllBookings();
 
-            // Tính toán lượt thuê hôm qua và hôm nay
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const todayStr = today.toISOString().split('T')[0];
@@ -74,7 +74,6 @@ export default function DashboardScreen() {
             yesterday.setDate(yesterday.getDate() - 1);
             const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-            // Đếm số booking được tạo trong ngày
             const todayRentals = allBookings.filter(b => {
                 if (!b.createdAt) return false;
                 const createdDate = new Date(b.createdAt);
@@ -104,7 +103,6 @@ export default function DashboardScreen() {
             console.log('✅ Chart data loaded:', chartData);
         } catch (error) {
             console.error('❌ Load chart data error:', error);
-            // Fallback to default data
             setChartData([
                 { date: 'Hôm qua', value: 0 },
                 { date: 'Hôm nay', value: stats.todayRentals },
@@ -115,7 +113,6 @@ export default function DashboardScreen() {
     useEffect(() => {
         loadDashboardStats();
 
-        // Auto refresh every 30 seconds
         const interval = setInterval(() => {
             loadDashboardStats();
         }, 30000);
@@ -309,6 +306,34 @@ export default function DashboardScreen() {
                             : 0}% phòng đang được sử dụng
                     </Text>
                 </View>
+                {financeSummary && (
+                    <View style={styles.financeContainer}>
+                        <Text style={styles.sectionTitle}>Tài chính tháng này</Text>
+                        <View style={styles.financeRow}>
+                            <View style={styles.financeCard}>
+                                <Ionicons name="trending-up" size={24} color="#22c55e" />
+                                <Text style={styles.financeLabel}>Thu nhập</Text>
+                                <Text style={[styles.financeValue, { color: '#22c55e' }]}>
+                                    {financeSummary.totalIncome.toLocaleString('vi-VN')}đ
+                                </Text>
+                            </View>
+                            <View style={styles.financeCard}>
+                                <Ionicons name="trending-down" size={24} color="#ef4444" />
+                                <Text style={styles.financeLabel}>Chi phí</Text>
+                                <Text style={[styles.financeValue, { color: '#ef4444' }]}>
+                                    {financeSummary.totalExpense.toLocaleString('vi-VN')}đ
+                                </Text>
+                            </View>
+                        </View>
+                        <View style={[styles.financeCard, { marginTop: 12 }]}>
+                            <Ionicons name="wallet" size={24} color="#4a90e2" />
+                            <Text style={styles.financeLabel}>Lợi nhuận</Text>
+                            <Text style={[styles.financeValue, { color: '#4a90e2' }]}>
+                                {financeSummary.profit.toLocaleString('vi-VN')}đ
+                            </Text>
+                        </View>
+                    </View>
+                )}
             </ScrollView>
         </View>
     );
@@ -538,4 +563,38 @@ const styles = StyleSheet.create({
         color: '#64748b',
         textAlign: 'center',
     },
+    financeContainer: {
+        backgroundColor: '#fff',
+        margin: 16,
+        marginTop: 0,
+        borderRadius: 16,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    financeRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    financeCard: {
+        flex: 1,
+        backgroundColor: '#f8fafc',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+    },
+    financeLabel: {
+        fontSize: 13,
+        color: '#64748b',
+        fontWeight: '600',
+        marginTop: 8,
+    },
+    financeValue: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginTop: 4,
+    }
 });

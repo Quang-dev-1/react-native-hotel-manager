@@ -40,54 +40,54 @@ export default function RegisterScreen() {
     let hasError = false;
 
     if (!name.trim()) {
-      setNameError('Please enter your full name');
+      setNameError('Vui lòng nhập họ và tên');
       hasError = true;
     } else {
       setNameError('');
     }
 
     if (!email.trim()) {
-      setEmailError('Please enter your email');
+      setEmailError('Vui lòng nhập email');
       hasError = true;
     } else if (!/\S+@\S+\.\S+/.test(email)) {
-      setEmailError('Please enter a valid email');
+      setEmailError('Vui lòng nhập email hợp lệ');
       hasError = true;
     } else {
       setEmailError('');
     }
 
     if (!phone.trim()) {
-      setPhoneError('Please enter your phone number');
+      setPhoneError('Vui lòng nhập số điện thoại');
       hasError = true;
     } else if (phone.length < 10) {
-      setPhoneError('Phone number must be at least 10 digits');
+      setPhoneError('Số điện thoại phải có ít nhất 10 chữ số');
       hasError = true;
     } else {
       setPhoneError('');
     }
 
     if (!password.trim()) {
-      setPasswordError('Please enter your password');
+      setPasswordError('Vui lòng nhập mật khẩu');
       hasError = true;
     } else if (password.length < 6) {
-      setPasswordError('Password must be at least 6 characters');
+      setPasswordError('Mật khẩu phải có ít nhất 6 ký tự');
       hasError = true;
     } else {
       setPasswordError('');
     }
 
     if (!confirmPassword.trim()) {
-      setConfirmPasswordError('Please confirm your password');
+      setConfirmPasswordError('Vui lòng xác nhận mật khẩu');
       hasError = true;
     } else if (password !== confirmPassword) {
-      setConfirmPasswordError('Passwords do not match');
+      setConfirmPasswordError('Mật khẩu không khớp');
       hasError = true;
     } else {
       setConfirmPasswordError('');
     }
 
     if (!agreeTerms) {
-      setTermsError('Please agree to Terms and Privacy Policy');
+      setTermsError('Vui lòng đồng ý với Điều Khoản và Chính Sách Bảo Mật');
       hasError = true;
     } else {
       setTermsError('');
@@ -107,8 +107,8 @@ export default function RegisterScreen() {
       });
 
       Alert.alert(
-        'Success',
-        'Registration successful! Please login with your credentials.',
+        'Thành Công',
+        'Đăng ký thành công! Vui lòng đăng nhập bằng thông tin của bạn.',
         [
           {
             text: 'OK',
@@ -117,8 +117,8 @@ export default function RegisterScreen() {
         ]
       );
     } catch (error: any) {
-      const errorMessage = error.message || 'Registration failed. Please try again.';
-      Alert.alert('Registration Failed', errorMessage);
+      const errorMessage = error.message || 'Đăng ký thất bại. Vui lòng thử lại.';
+      Alert.alert('Đăng Ký Thất Bại', errorMessage);
 
       if (errorMessage.toLowerCase().includes('email')) {
         setEmailError(errorMessage);
@@ -146,8 +146,8 @@ export default function RegisterScreen() {
               style={styles.logo}
               source={require('../../assets/images/HotelManager.png')}
             />
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join us to start shopping</Text>
+            <Text style={styles.title}>Tạo Tài Khoản</Text>
+            <Text style={styles.subtitle}>Tham gia cùng chúng tôi để bắt đầu mua sắm</Text>
           </View>
 
           <View style={styles.form}>
@@ -156,7 +156,7 @@ export default function RegisterScreen() {
                 <Ionicons name="person" size={20} color="#1f2035ff" />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Full Name"
+                  placeholder="Họ và Tên"
                   value={name}
                   onChangeText={(text) => {
                     setName(text);
@@ -205,7 +205,7 @@ export default function RegisterScreen() {
                 <Ionicons name="call" size={20} color="#1f2035ff" />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Phone Number"
+                  placeholder="Số Điện Thoại"
                   value={phone}
                   onChangeText={(text) => {
                     setPhone(text);
@@ -229,7 +229,7 @@ export default function RegisterScreen() {
                 <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Password"
+                  placeholder="Mật Khẩu"
                   value={password}
                   onChangeText={(text) => {
                     setPassword(text);
@@ -257,7 +257,7 @@ export default function RegisterScreen() {
                 <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Confirm Password"
+                  placeholder="Xác Nhận Mật Khẩu"
                   value={confirmPassword}
                   onChangeText={(text) => {
                     setConfirmPassword(text);
@@ -292,7 +292,7 @@ export default function RegisterScreen() {
                   {agreeTerms && <View style={styles.checkDot} />}
                 </View>
                 <Text style={styles.termsTxt}>
-                  I agree to the Terms of Service and Privacy Policy
+                  Tôi đồng ý với Điều Khoản Dịch Vụ và Chính Sách Bảo Mật
                 </Text>
               </TouchableOpacity>
               {termsError ? (
@@ -312,7 +312,7 @@ export default function RegisterScreen() {
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <>
-                    <Text style={styles.btnTxt}>Create Account</Text>
+                    <Text style={styles.btnTxt}>Tạo Tài Khoản</Text>
                     <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
                   </>
                 )}
@@ -321,7 +321,7 @@ export default function RegisterScreen() {
 
             <View style={styles.divider}>
               <View style={styles.line} />
-              <Text style={styles.dividerTxt}>OR</Text>
+              <Text style={styles.dividerTxt}>HOẶC</Text>
               <View style={styles.line} />
             </View>
 
@@ -338,11 +338,11 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.signin}>
-              <Text style={styles.signinTxt}>Already have an account? </Text>
+              <Text style={styles.signinTxt}>Đã có tài khoản? </Text>
               <TouchableOpacity
                 onPress={() => router.back()}
                 disabled={loading}>
-                <Text style={styles.signinLink}>Sign In</Text>
+                <Text style={styles.signinLink}>Đăng Nhập</Text>
               </TouchableOpacity>
             </View>
           </View>

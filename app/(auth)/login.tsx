@@ -34,7 +34,6 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  // Load saved credentials khi component mount
   useEffect(() => {
     loadSavedCredentials();
   }, []);
@@ -63,7 +62,6 @@ export default function LoginScreen() {
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_EMAIL, email.trim());
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_PASSWORD, password);
       } else {
-        // Xóa thông tin đã lưu nếu không chọn remember me
         await AsyncStorage.multiRemove([
           STORAGE_KEYS.REMEMBER_ME,
           STORAGE_KEYS.SAVED_EMAIL,
@@ -81,13 +79,11 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    // Reset errors
     setEmailError('');
     setPasswordError('');
 
     let hasError = false;
 
-    // Validate email
     if (!email.trim()) {
       setEmailError('Vui lòng nhập email');
       hasError = true;
@@ -96,7 +92,6 @@ export default function LoginScreen() {
       hasError = true;
     }
 
-    // Validate password
     if (!password.trim()) {
       setPasswordError('Vui lòng nhập mật khẩu');
       hasError = true;
@@ -112,10 +107,8 @@ export default function LoginScreen() {
         password: password,
       });
 
-      // Lưu thông tin đăng nhập nếu thành công
       await saveCredentials();
 
-      // Chuyển trang không cần Alert
       router.replace('/(drawer)/dashboard');
     } catch (error: any) {
       console.error('Login error:', error);
@@ -141,7 +134,6 @@ export default function LoginScreen() {
     const newValue = !rememberMe;
     setRememberMe(newValue);
 
-    // Nếu bỏ chọn remember me, xóa thông tin đã lưu ngay lập tức
     if (!newValue) {
       try {
         await AsyncStorage.multiRemove([

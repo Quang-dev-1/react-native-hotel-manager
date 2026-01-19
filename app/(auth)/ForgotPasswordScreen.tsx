@@ -25,7 +25,6 @@ export default function ForgotPasswordScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    // Error states
     const [phoneError, setPhoneError] = useState('');
     const [codeError, setCodeError] = useState('');
     const [passwordError, setPasswordError] = useState('');
@@ -36,37 +35,37 @@ export default function ForgotPasswordScreen() {
 
     const handleSendCode = () => {
         if (!phone.trim()) {
-            setPhoneError('Please enter phone number');
+            setPhoneError('Vui lòng nhập số điện thoại');
             return;
         }
 
         const phoneRegex = /^[0-9]{10}$/;
         if (!phoneRegex.test(phone)) {
-            setPhoneError('Please enter a valid 10-digit phone number');
+            setPhoneError('Vui lòng nhập số điện thoại hợp lệ gồm 10 chữ số');
             return;
         }
 
         if (!mockUsers.includes(phone)) {
-            setPhoneError('This phone number is not registered in our system');
+            setPhoneError('Số điện thoại này chưa được đăng ký trong hệ thống');
             return;
         }
 
         setPhoneError('');
         Alert.alert(
-            'Verification Code Sent',
-            `A verification code has been sent to ${phone}\n\nFor testing, use code: 123456`,
+            'Đã Gửi Mã Xác Thực',
+            `Mã xác thực đã được gửi đến ${phone}\n\nĐể kiểm tra, sử dụng mã: 123456`,
             [{ text: 'OK', onPress: () => setStep('code') }]
         );
     };
 
     const handleVerifyCode = () => {
         if (!verificationCode.trim()) {
-            setCodeError('Please enter the verification code');
+            setCodeError('Vui lòng nhập mã xác thực');
             return;
         }
 
         if (verificationCode !== mockVerificationCode) {
-            setCodeError('Invalid verification code. Please try again');
+            setCodeError('Mã xác thực không hợp lệ. Vui lòng thử lại');
             return;
         }
 
@@ -78,17 +77,17 @@ export default function ForgotPasswordScreen() {
         let hasError = false;
 
         if (!newPassword.trim()) {
-            setPasswordError('Please enter your new password');
+            setPasswordError('Vui lòng nhập mật khẩu mới');
             hasError = true;
         } else if (newPassword.length < 6) {
-            setPasswordError('Password must be at least 6 characters');
+            setPasswordError('Mật khẩu phải có ít nhất 6 ký tự');
             hasError = true;
         } else {
             setPasswordError('');
         }
 
         if (newPassword !== confirmPassword) {
-            setConfirmPasswordError('Passwords do not match');
+            setConfirmPasswordError('Mật khẩu không khớp');
             hasError = true;
         } else {
             setConfirmPasswordError('');
@@ -97,14 +96,14 @@ export default function ForgotPasswordScreen() {
         if (hasError) return;
 
         Alert.alert(
-            'Success!',
-            'Your password has been reset successfully.',
-            [{ text: 'Go to Login', onPress: () => router.replace('/(auth)/login') }]
+            'Thành Công!',
+            'Mật khẩu của bạn đã được đặt lại thành công.',
+            [{ text: 'Đến Đăng Nhập', onPress: () => router.replace('/(auth)/login') }]
         );
     };
 
     const handleResendCode = () => {
-        Alert.alert('Code Resent', `A new verification code has been sent to ${phone}\n\nFor testing, use code: 123456`);
+        Alert.alert('Đã Gửi Lại Mã', `Mã xác thực mới đã được gửi đến ${phone}\n\nĐể kiểm tra, sử dụng mã: 123456`);
     };
 
     const handleBack = () => {
@@ -121,15 +120,15 @@ export default function ForgotPasswordScreen() {
     };
 
     const getTitle = () => {
-        if (step === 'phone') return 'Forgot Password?';
-        if (step === 'code') return 'Verification Code';
-        return 'New Password';
+        if (step === 'phone') return 'Quên Mật Khẩu?';
+        if (step === 'code') return 'Mã Xác Thực';
+        return 'Mật Khẩu Mới';
     };
 
     const getSubtitle = () => {
-        if (step === 'phone') return 'Enter your phone to receive a verification code';
-        if (step === 'code') return 'Enter the code sent to your phone';
-        return 'Create a new password for your account';
+        if (step === 'phone') return 'Nhập số điện thoại để nhận mã xác thực';
+        if (step === 'code') return 'Nhập mã được gửi đến điện thoại của bạn';
+        return 'Tạo mật khẩu mới cho tài khoản của bạn';
     };
 
     return (
@@ -143,12 +142,12 @@ export default function ForgotPasswordScreen() {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled">
 
-                    {/* Back Button */}
+                    {/* Nút Quay Lại */}
                     <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
                         <Ionicons name="arrow-back" size={24} color="#1f2035ff" />
                     </TouchableOpacity>
 
-                    {/* Logo & Title */}
+                    {/* Logo & Tiêu Đề */}
                     <View style={styles.header}>
                         <Image
                             style={styles.logo}
@@ -160,7 +159,7 @@ export default function ForgotPasswordScreen() {
 
                     {/* Form */}
                     <View style={styles.form}>
-                        {/* Step 1: Phone */}
+                        {/* Bước 1: Số Điện Thoại */}
                         {step === 'phone' && (
                             <>
                                 <View>
@@ -168,7 +167,7 @@ export default function ForgotPasswordScreen() {
                                         <Ionicons name="call" size={20} color="#1f2035ff" />
                                         <TextInput
                                             style={styles.textInput}
-                                            placeholder="Phone Number"
+                                            placeholder="Số Điện Thoại"
                                             value={phone}
                                             onChangeText={(text) => {
                                                 setPhone(text);
@@ -189,14 +188,14 @@ export default function ForgotPasswordScreen() {
 
                                 <TouchableOpacity onPress={handleSendCode} style={styles.btnWrap}>
                                     <LinearGradient colors={['#1f2035ff', '#151165ff']} style={styles.btn}>
-                                        <Text style={styles.btnTxt}>Send Code</Text>
+                                        <Text style={styles.btnTxt}>Gửi Mã</Text>
                                         <Ionicons name="send" size={20} color="#fff" />
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </>
                         )}
 
-                        {/* Step 2: Verification Code */}
+                        {/* Bước 2: Mã Xác Thực */}
                         {step === 'code' && (
                             <>
                                 <View>
@@ -225,22 +224,22 @@ export default function ForgotPasswordScreen() {
                                 </View>
 
                                 <View style={styles.resend}>
-                                    <Text style={styles.resendTxt}>Didn`t receive the code? </Text>
+                                    <Text style={styles.resendTxt}>Chưa nhận được mã? </Text>
                                     <TouchableOpacity onPress={handleResendCode}>
-                                        <Text style={styles.resendLink}>Resend</Text>
+                                        <Text style={styles.resendLink}>Gửi Lại</Text>
                                     </TouchableOpacity>
                                 </View>
 
                                 <TouchableOpacity onPress={handleVerifyCode} style={styles.btnWrap}>
                                     <LinearGradient colors={['#1f2035ff', '#151165ff']} style={styles.btn}>
-                                        <Text style={styles.btnTxt}>Verify Code</Text>
+                                        <Text style={styles.btnTxt}>Xác Thực Mã</Text>
                                         <Ionicons name="checkmark-circle" size={20} color="#fff" />
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </>
                         )}
 
-                        {/* Step 3: New Password */}
+                        {/* Bước 3: Mật Khẩu Mới */}
                         {step === 'newPassword' && (
                             <>
                                 <View>
@@ -248,13 +247,13 @@ export default function ForgotPasswordScreen() {
                                         <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
                                         <TextInput
                                             style={styles.textInput}
-                                            placeholder="New Password"
+                                            placeholder="Mật Khẩu Mới"
                                             value={newPassword}
                                             onChangeText={(text) => {
                                                 setNewPassword(text);
                                                 setPasswordError('');
                                                 if (confirmPassword && text !== confirmPassword) {
-                                                    setConfirmPasswordError('Passwords do not match');
+                                                    setConfirmPasswordError('Mật khẩu không khớp');
                                                 } else {
                                                     setConfirmPasswordError('');
                                                 }
@@ -281,12 +280,12 @@ export default function ForgotPasswordScreen() {
                                         <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
                                         <TextInput
                                             style={styles.textInput}
-                                            placeholder="Confirm Password"
+                                            placeholder="Xác Nhận Mật Khẩu"
                                             value={confirmPassword}
                                             onChangeText={(text) => {
                                                 setConfirmPassword(text);
                                                 if (newPassword !== text) {
-                                                    setConfirmPasswordError('Passwords do not match');
+                                                    setConfirmPasswordError('Mật khẩu không khớp');
                                                 } else {
                                                     setConfirmPasswordError('');
                                                 }
@@ -308,14 +307,14 @@ export default function ForgotPasswordScreen() {
                                 </View>
 
                                 <View style={styles.requirements}>
-                                    <Text style={styles.reqTitle}>Password must:</Text>
+                                    <Text style={styles.reqTitle}>Mật khẩu phải:</Text>
                                     <View style={styles.reqItem}>
                                         <Ionicons
                                             name={newPassword.length >= 6 ? 'checkmark-circle' : 'ellipse-outline'}
                                             size={16}
                                             color={newPassword.length >= 6 ? '#10b981' : '#9ca3af'}
                                         />
-                                        <Text style={styles.reqTxt}>Be at least 6 characters</Text>
+                                        <Text style={styles.reqTxt}>Có ít nhất 6 ký tự</Text>
                                     </View>
                                     <View style={styles.reqItem}>
                                         <Ionicons
@@ -323,13 +322,13 @@ export default function ForgotPasswordScreen() {
                                             size={16}
                                             color={newPassword === confirmPassword && newPassword.length > 0 ? '#10b981' : '#9ca3af'}
                                         />
-                                        <Text style={styles.reqTxt}>Match confirmation password</Text>
+                                        <Text style={styles.reqTxt}>Khớp với mật khẩu xác nhận</Text>
                                     </View>
                                 </View>
 
                                 <TouchableOpacity onPress={handleResetPassword} style={styles.btnWrap}>
                                     <LinearGradient colors={['#1f2035ff', '#151165ff']} style={styles.btn}>
-                                        <Text style={styles.btnTxt}>Reset Password</Text>
+                                        <Text style={styles.btnTxt}>Đặt Lại Mật Khẩu</Text>
                                         <Ionicons name="shield-checkmark" size={20} color="#fff" />
                                     </LinearGradient>
                                 </TouchableOpacity>

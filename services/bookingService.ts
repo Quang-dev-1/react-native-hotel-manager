@@ -35,7 +35,22 @@ export interface DashboardStats {
   availableRooms: number;
 }
 
-export interface BookingWithServices extends Booking {
+export interface BookingWithServices {
+  id?: number;
+  roomId: number;
+  roomNumber?: string;
+  customerName: string;
+  phone: string;
+  checkIn: string;
+  checkOut: string;
+  nights: number;
+  roomAmount: number;
+  serviceAmount: number;
+  totalAmount: number;
+  deposit: number;
+  status: string;
+  notes?: string;
+  createdAt?: string;
   services?: {
     id: number;
     serviceId: number;
@@ -44,8 +59,6 @@ export interface BookingWithServices extends Booking {
     price: number;
     totalPrice: number;
   }[];
-  serviceAmount?: number;
-  roomAmount?: number;
 }
 
 export interface UpdateBookingRequest {
@@ -58,13 +71,11 @@ export interface UpdateBookingRequest {
 }
 
 class BookingService {
-  // ============ BOOKING APIs ============
 
   async createBooking(data: CreateBookingRequest): Promise<Booking> {
     try {
       console.log('➕ Creating booking:', data);
 
-      // Kiểm tra xem có booking CHECKED_IN cho phòng này không
       const activeBookings = await this.getActiveBookings();
       const hasCheckedIn = activeBookings.some(
         b => b.roomId === data.roomId && b.status === 'CHECKED_IN'
@@ -126,10 +137,8 @@ class BookingService {
     try {
       console.log(`📅 Fetching booked dates for room ${roomId}...`);
 
-      // Sử dụng endpoint /bookings thay vì /bookings/room/{roomId}/active
       const response = await apiClient.get<Booking[]>('/bookings');
 
-      // Filter bookings cho phòng này và có trạng thái active
       const roomBookings = response.data.filter(booking =>
         booking.roomId === roomId &&
         ['PENDING', 'CONFIRMED', 'CHECKED_IN'].includes(booking.status)
@@ -191,12 +200,10 @@ class BookingService {
     }
   }
 
-  // Xác nhận đặt phòng (PENDING -> CONFIRMED)
   async confirmBooking(bookingId: number): Promise<Booking> {
     try {
       const booking = await this.getBookingById(bookingId);
 
-      // Kiểm tra xem có booking CHECKED_IN nào cho phòng này không
       const activeBookings = await this.getActiveBookings();
       const hasCheckedIn = activeBookings.some(
         b => b.roomId === booking.roomId && b.status === 'CHECKED_IN' && b.id !== bookingId
@@ -216,12 +223,10 @@ class BookingService {
     }
   }
 
-  // Nhận phòng (CONFIRMED -> CHECKED_IN)
   async checkIn(bookingId: number): Promise<Booking> {
     try {
       const booking = await this.getBookingById(bookingId);
 
-      // Kiểm tra xem có booking CHECKED_IN nào cho phòng này không
       const activeBookings = await this.getActiveBookings();
       const hasCheckedIn = activeBookings.some(
         b => b.roomId === booking.roomId && b.status === 'CHECKED_IN' && b.id !== bookingId
@@ -241,7 +246,6 @@ class BookingService {
     }
   }
 
-  // Trả phòng (CHECKED_IN -> CHECKED_OUT)
   async checkOut(bookingId: number): Promise<Booking> {
     try {
       console.log(`📤 Request: PUT /bookings/${bookingId}/checkout`);
@@ -254,7 +258,6 @@ class BookingService {
     }
   }
 
-  // Hoàn thành (CHECKED_OUT -> COMPLETED)
   async completeBooking(bookingId: number): Promise<Booking> {
     try {
       console.log(`📤 Request: PUT /bookings/${bookingId}/complete`);
@@ -267,7 +270,6 @@ class BookingService {
     }
   }
 
-  // Hủy đặt phòng
   async cancelBooking(bookingId: number): Promise<void> {
     try {
       console.log(`📤 Request: PUT /bookings/${bookingId}/cancel`);
@@ -279,7 +281,6 @@ class BookingService {
     }
   }
 
-  // ============ STATISTICS APIs ============
 
   async getDashboardStats(): Promise<DashboardStats> {
     try {
@@ -290,6 +291,20 @@ class BookingService {
     } catch (error: any) {
       console.error('❌ Get stats error:', error);
       throw new Error(error.response?.data?.message || 'Không thể lấy thống kê');
+    }
+  }
+
+  async changeRoom(bookingId: number, newRoomId: number): Promise<Booking> {
+    try {
+      console.log(`🔄 Changing room for booking ${bookingId} to room ${newRoomId}`);
+      const response = await apiClient.put<Booking>(`/bookings/${bookingId}/change-room`, {
+        newRoomId: newRoomId
+      });
+      console.log('✅ Room changed successfully:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Change room error:', error);
+      throw new Error(error.response?.data?.message || 'Không thể đổi phòng');
     }
   }
 }

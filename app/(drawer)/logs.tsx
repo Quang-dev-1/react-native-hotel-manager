@@ -1,3 +1,4 @@
+import bookingService from '@/services/bookingService';
 import historyService, { HistoryRecord } from '@/services/historyService';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -19,25 +20,45 @@ export default function LogsScreen() {
     const [history, setHistory] = useState<HistoryRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [historyWithServices, setHistoryWithServices] = useState<{ [key: number]: any }>({});
 
+    const fetchHistoryWithServices = async (historyId: number, bookingId: number) => {
+        try {
+            const bookingDetail = await bookingService.getBookingWithServices(bookingId);
+            setHistoryWithServices(prev => ({
+                ...prev,
+                [historyId]: bookingDetail
+            }));
+        } catch (error) {
+            console.error('Error fetching history services:', error);
+        }
+    };
     const fetchHistory = async () => {
         try {
             setLoading(true);
             const data = await historyService.getAllHistory();
-            // Sắp xếp theo ngày tạo mới nhất
             const sortedData = data.sort((a, b) => {
                 const dateA = new Date(a.createdAt || a.actualCheckOut);
                 const dateB = new Date(b.createdAt || b.actualCheckOut);
                 return dateB.getTime() - dateA.getTime();
             });
             setHistory(sortedData);
+
+            setLoading(false);
+
+            loadServicesInBackground(sortedData);
         } catch (error: any) {
             Alert.alert('Lỗi', error.message || 'Không thể tải lịch sử');
-        } finally {
             setLoading(false);
         }
     };
-
+    const loadServicesInBackground = async (historyData: HistoryRecord[]) => {
+        for (const record of historyData) {
+            if (record.id && record.bookingId) {
+                fetchHistoryWithServices(record.id, record.bookingId);
+            }
+        }
+    };
     useFocusEffect(
         useCallback(() => {
             fetchHistory();
@@ -149,8 +170,10 @@ export default function LogsScreen() {
                 <View style={styles.statsCard}>
                     <View style={styles.statItem}>
                         <Ionicons name="receipt-outline" size={32} color="#4a90e2" />
-                        <Text style={styles.statNumber}>{history.length}</Text>
-                        <Text style={styles.statLabel}>Tổng bản ghi</Text>
+                        <Text style={styles.statNumber}>
+                            {history.reduce((sum, h) => sum + h.roomAmount + h.serviceAmount, 0).toLocaleString('vi-VN')}đ
+                        </Text>
+                        <Text style={styles.statLabel}>Tổng doanh thu</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
@@ -215,7 +238,26 @@ export default function LogsScreen() {
                                 </View>
                             )}
                         </View>
-
+                        {historyWithServices[record.id!] &&
+                            historyWithServices[record.id!].services &&
+                            historyWithServices[record.id!].services.length > 0 && (
+                                <View style={styles.servicesSection}>
+                                    <View style={styles.servicesSectionHeader}>
+                                        <Ionicons name="cube-outline" size={14} color="#4a90e2" />
+                                        <Text style={styles.servicesSectionTitle}>Dịch vụ đã sử dụng:</Text>
+                                    </View>
+                                    {historyWithServices[record.id!].services.map((service: any, index: number) => (
+                                        <View key={index} style={styles.serviceItem}>
+                                            <Text style={styles.serviceItemName}>
+                                                • {service.serviceName} x{service.quantity}
+                                            </Text>
+                                            <Text style={styles.serviceItemPrice}>
+                                                {service.totalPrice.toLocaleString('vi-VN')}đ
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
                         <View style={styles.cardFooter}>
                             <View style={styles.amountRow}>
                                 <Text style={styles.amountLabel}>Tiền phòng:</Text>
@@ -232,13 +274,19 @@ export default function LogsScreen() {
                                 </View>
                             )}
                             <View style={styles.amountRow}>
+                                <Text style={styles.amountLabel}>Tổng cộng:</Text>
+                                <Text style={styles.amountValue}>
+                                    {(record.roomAmount + record.serviceAmount).toLocaleString('vi-VN')}đ
+                                </Text>
+                            </View>
+                            <View style={styles.amountRow}>
                                 <Text style={styles.amountLabel}>Đã đặt cọc:</Text>
                                 <Text style={styles.amountValue}>
                                     {record.deposit.toLocaleString('vi-VN')}đ
                                 </Text>
                             </View>
                             <View style={styles.totalRow}>
-                                <Text style={styles.totalLabel}>Tổng thanh toán:</Text>
+                                <Text style={styles.totalLabel}>Còn phải thu:</Text>
                                 <Text style={styles.totalValue}>
                                     {record.totalAmount.toLocaleString('vi-VN')}đ
                                 </Text>
@@ -526,5 +574,39 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#64748b',
         textAlign: 'center',
+    }, servicesSection: {
+        padding: 12,
+        backgroundColor: '#f8fafc',
+        borderTopWidth: 1,
+        borderTopColor: '#e2e8f0',
+    },
+    servicesSectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
+    },
+    servicesSectionTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#475569',
+    },
+    serviceItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 4,
+        paddingLeft: 16,
+    },
+    serviceItemName: {
+        fontSize: 13,
+        color: '#64748b',
+        fontWeight: '500',
+        flex: 1,
+    },
+    serviceItemPrice: {
+        fontSize: 13,
+        color: '#1e293b',
+        fontWeight: '600',
     },
 });

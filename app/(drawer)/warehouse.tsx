@@ -68,10 +68,54 @@ export default function WarehouseScreen() {
             const item = inventory.find(i => i.id === id);
             if (!item) return;
 
-            const newQuantity = item.quantity + addQuantity;
-            await inventoryService.updateStock(id, newQuantity);
-            Alert.alert('Thành công', 'Đã nhập hàng');
-            fetchInventory();
+            const totalCost = addQuantity * item.price;
+            Alert.alert(
+                'Xác nhận nhập hàng',
+                `Sản phẩm: ${item.name}\nSố lượng: ${addQuantity} ${item.unit}\nTổng chi phí: ${totalCost.toLocaleString('vi-VN')}đ\n\nChọn phương thức thanh toán:`,
+                [
+                    {
+                        text: '💵 Tiền mặt',
+                        onPress: async () => {
+                            try {
+                                await inventoryService.addStockWithTransaction(id, addQuantity, 'CASH');
+                                Alert.alert('Thành công', 'Đã nhập hàng và ghi nhận chi phí');
+                                fetchInventory();
+                            } catch (error: any) {
+                                Alert.alert('Lỗi', error.message);
+                            }
+                        }
+                    },
+                    {
+                        text: '🏦 Chuyển khoản',
+                        onPress: async () => {
+                            try {
+                                await inventoryService.addStockWithTransaction(id, addQuantity, 'TRANSFER');
+                                Alert.alert('Thành công', 'Đã nhập hàng và ghi nhận chi phí');
+                                fetchInventory();
+                            } catch (error: any) {
+                                Alert.alert('Lỗi', error.message);
+                            }
+                        }
+                    },
+                    {
+                        text: '💳 Thẻ',
+                        onPress: async () => {
+                            try {
+                                await inventoryService.addStockWithTransaction(id, addQuantity, 'CARD');
+                                Alert.alert('Thành công', 'Đã nhập hàng và ghi nhận chi phí');
+                                fetchInventory();
+                            } catch (error: any) {
+                                Alert.alert('Lỗi', error.message);
+                            }
+                        }
+                    },
+                    {
+                        text: 'Hủy',
+                        style: 'cancel'
+                    }
+                ],
+                { cancelable: true }
+            );
         } catch (error: any) {
             Alert.alert('Lỗi', error.message);
         }

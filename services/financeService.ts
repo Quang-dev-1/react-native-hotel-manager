@@ -1,13 +1,13 @@
-import apiClient from './api';
+import api from './api';
 
 export interface Transaction {
-  id?: number;
-  type: string; // INCOME or EXPENSE
+  id: number;
+  type: 'INCOME' | 'EXPENSE';
   category: string;
   amount: number;
   description: string;
   transactionDate: string;
-  paymentMethod: string; // CASH, CARD, BANK_TRANSFER
+  paymentMethod: 'CASH' | 'TRANSFER' | 'CARD';
   bookingId?: number;
   createdAt?: string;
 }
@@ -20,83 +20,78 @@ export interface FinanceSummary {
   endDate: string;
 }
 
+export interface CreateTransactionRequest {
+  type: 'INCOME' | 'EXPENSE';
+  category: string;
+  amount: number;
+  description: string;
+  transactionDate: string;
+  paymentMethod: 'CASH' | 'TRANSFER' | 'CARD';
+  bookingId?: number;
+}
+
 class FinanceService {
-  // ============ TRANSACTION APIs ============
-  
-  async createTransaction(data: Transaction): Promise<Transaction> {
+  async getTransactions(period?: 'day' | 'week' | 'month' | 'year'): Promise<Transaction[]> {
     try {
-      console.log('➕ Creating transaction:', data);
-      const response = await apiClient.post<Transaction>('/transactions', data);
-      console.log('✅ Transaction created:', response.data);
+      const params = period ? { period } : {};
+      const response = await api.get('/transactions', { params });
       return response.data;
-    } catch (error: any) {
-      console.error('❌ Create transaction error:', error.response?.data || error);
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      }
-      throw new Error('Không thể tạo giao dịch');
-    }
-  }
-
-  async getAllTransactions(): Promise<Transaction[]> {
-    try {
-      console.log('📋 Fetching all transactions...');
-      const response = await apiClient.get<Transaction[]>('/transactions');
-      console.log('✅ Transactions fetched:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Get transactions error:', error);
-      throw new Error(error.response?.data?.message || 'Không thể lấy danh sách giao dịch');
-    }
-  }
-
-  async getTransactionsByType(type: string): Promise<Transaction[]> {
-    try {
-      const response = await apiClient.get<Transaction[]>(`/transactions/type/${type}`);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Get transactions by type error:', error);
-      throw new Error(error.response?.data?.message || 'Không thể lấy giao dịch theo loại');
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      throw error;
     }
   }
 
   async getTransactionsByDateRange(startDate: string, endDate: string): Promise<Transaction[]> {
     try {
-      const response = await apiClient.get<Transaction[]>(
-        `/transactions/date-range?startDate=${startDate}&endDate=${endDate}`
-      );
+      const response = await api.get('/transactions/date-range', {
+        params: { startDate, endDate }
+      });
       return response.data;
-    } catch (error: any) {
-      console.error('❌ Get transactions by date range error:', error);
-      throw new Error(error.response?.data?.message || 'Không thể lấy giao dịch theo khoảng thời gian');
+    } catch (error) {
+      console.error('Error fetching transactions by date range:', error);
+      throw error;
+    }
+  }
+
+  async getFinanceSummary(period?: 'day' | 'week' | 'month' | 'year'): Promise<FinanceSummary> {
+    try {
+      const params = period ? { period } : {};
+      const response = await api.get('/transactions/summary', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching finance summary:', error);
+      throw error;
+    }
+  }
+
+  async createTransaction(data: CreateTransactionRequest): Promise<Transaction> {
+    try {
+      const response = await api.post('/transactions', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      throw error;
     }
   }
 
   async deleteTransaction(id: number): Promise<void> {
     try {
-      console.log('🗑️ Deleting transaction:', id);
-      await apiClient.delete(`/transactions/${id}`);
-      console.log('✅ Transaction deleted');
-    } catch (error: any) {
-      console.error('❌ Delete transaction error:', error);
-      throw new Error(error.response?.data?.message || 'Không thể xóa giao dịch');
+      await api.delete(`/transactions/${id}`);
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      throw error;
     }
   }
 
-  // ============ FINANCE SUMMARY APIs ============
-  
-  async getFinanceSummary(startDate: string, endDate: string): Promise<FinanceSummary> {
-    try {
-      console.log('📊 Fetching finance summary...');
-      const response = await apiClient.get<FinanceSummary>(
-        `/transactions/summary?startDate=${startDate}&endDate=${endDate}`
-      );
-      console.log('✅ Finance summary fetched:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Get finance summary error:', error);
-      throw new Error(error.response?.data?.message || 'Không thể lấy báo cáo tài chính');
-    }
+  formatDateForAPI(dateStr: string): string {
+    const [day, month, year] = dateStr.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  formatDateForDisplay(dateStr: string): string {
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
   }
 }
 

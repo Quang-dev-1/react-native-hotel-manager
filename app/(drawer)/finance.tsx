@@ -1,19 +1,25 @@
+import financeService, { FinanceSummary } from '@/services/financeService';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     Dimensions,
+    Modal,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
 
-interface Transaction {
+interface DisplayTransaction {
     id: number;
     type: 'income' | 'expense';
     category: string;
@@ -27,83 +33,138 @@ export default function FinanceScreen() {
     const navigation = useNavigation();
     const [selectedPeriod, setSelectedPeriod] = useState('month');
     const [showAddModal, setShowAddModal] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [showSuppliesOnly, setShowSuppliesOnly] = useState(false);
+    const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
+    const [summary, setSummary] = useState<FinanceSummary>({
+        totalIncome: 0,
+        totalExpense: 0,
+        profit: 0,
+        startDate: '',
+        endDate: ''
+    });
 
-    // Mock data
-    const [transactions] = useState<Transaction[]>([
-        {
-            id: 1,
-            type: 'income',
-            category: 'room_rental',
-            amount: 1500000,
-            description: 'Phòng 102 - 3 đêm',
-            date: '15/12/2025',
-            paymentMethod: 'cash',
-        },
-        {
-            id: 2,
-            type: 'income',
-            category: 'room_rental',
-            amount: 2000000,
-            description: 'Phòng 203 - 4 đêm',
-            date: '16/12/2025',
-            paymentMethod: 'transfer',
-        },
-        {
-            id: 3,
-            type: 'expense',
-            category: 'supplies',
-            amount: 500000,
-            description: 'Mua vật tư tiêu hao',
-            date: '14/12/2025',
-            paymentMethod: 'cash',
-        },
-        {
-            id: 4,
-            type: 'expense',
-            category: 'salary',
-            amount: 5000000,
-            description: 'Lương nhân viên tháng 12',
-            date: '01/12/2025',
-            paymentMethod: 'transfer',
-        },
-        {
-            id: 5,
-            type: 'expense',
-            category: 'utilities',
-            amount: 1200000,
-            description: 'Tiền điện nước tháng 12',
-            date: '05/12/2025',
-            paymentMethod: 'transfer',
-        },
-        {
-            id: 6,
-            type: 'income',
-            category: 'service',
-            amount: 300000,
-            description: 'Dịch vụ giặt ủi',
-            date: '17/12/2025',
-            paymentMethod: 'cash',
-        },
-    ]);
+    const [formData, setFormData] = useState({
+        type: 'INCOME' as 'INCOME' | 'EXPENSE',
+        category: '',
+        amount: '',
+        description: '',
+        paymentMethod: 'CASH' as 'CASH' | 'TRANSFER' | 'CARD',
+    });
 
     const periods = [
         { key: 'day', label: 'Hôm nay' },
         { key: 'week', label: 'Tuần này' },
         { key: 'month', label: 'Tháng này' },
         { key: 'year', label: 'Năm này' },
-    ];
 
-    const calculateTotals = () => {
-        const income = transactions
-            .filter(t => t.type === 'income')
-            .reduce((sum, t) => sum + t.amount, 0);
-        const expense = transactions
-            .filter(t => t.type === 'expense')
-            .reduce((sum, t) => sum + t.amount, 0);
-        return { income, expense, profit: income - expense };
+    ];
+    const displayedTransactions = showSuppliesOnly
+        ? transactions.filter(t => t.category === 'supplies' && t.type === 'expense')
+        : transactions;
+    useEffect(() => {
+        loadData();
+    }, [selectedPeriod]);
+
+    const loadData = async () => {
+        try {
+            setLoading(true);
+
+            const [transactionsData, summaryData] = await Promise.all([
+                financeService.getTransactions(selectedPeriod as any),
+                financeService.getFinanceSummary(selectedPeriod as any)
+            ]);
+
+            const displayTransactions = transactionsData.map(t => ({
+                id: t.id,
+                type: t.type.toLowerCase() as 'income' | 'expense',
+                category: t.category.toLowerCase(),
+                amount: Number(t.amount),
+                description: t.description,
+                date: financeService.formatDateForDisplay(t.transactionDate),
+                paymentMethod: t.paymentMethod.toLowerCase()
+            }));
+
+            setTransactions(displayTransactions);
+            setSummary(summaryData);
+        } catch (error) {
+            Alert.alert('Lỗi', 'Không thể tải dữ liệu. Vui lòng thử lại.');
+            console.error('Load data error:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const totals = calculateTotals();
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await loadData();
+        setRefreshing(false);
+    }, [selectedPeriod]);
+
+    const handleCreateTransaction = async () => {
+        try {
+            if (!formData.category || !formData.amount || !formData.description) {
+                Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+                return;
+            }
+
+            const amount = parseFloat(formData.amount);
+            if (isNaN(amount) || amount <= 0) {
+                Alert.alert('Lỗi', 'Số tiền không hợp lệ');
+                return;
+            }
+
+            await financeService.createTransaction({
+                type: formData.type,
+                category: formData.category,
+                amount: amount,
+                description: formData.description,
+                transactionDate: new Date().toISOString().split('T')[0],
+                paymentMethod: formData.paymentMethod
+            });
+
+            Alert.alert('Thành công', 'Đã thêm giao dịch mới');
+            setShowAddModal(false);
+
+            setFormData({
+                type: 'INCOME',
+                category: '',
+                amount: '',
+                description: '',
+                paymentMethod: 'CASH',
+            });
+
+            await loadData();
+        } catch (error) {
+            Alert.alert('Lỗi', 'Không thể tạo giao dịch. Vui lòng thử lại.');
+            console.error('Create transaction error:', error);
+        }
+    };
+
+    const handleDeleteTransaction = async (id: number) => {
+        Alert.alert(
+            'Xác nhận xóa',
+            'Bạn có chắc chắn muốn xóa giao dịch này?',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Xóa',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await financeService.deleteTransaction(id);
+                            Alert.alert('Thành công', 'Đã xóa giao dịch');
+                            await loadData();
+                        } catch (error) {
+                            Alert.alert('Lỗi', 'Không thể xóa giao dịch');
+                            console.error('Delete transaction error:', error);
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const getCategoryInfo = (category: string) => {
         const categories: Record<string, { label: string; icon: string; color: string }> = {
@@ -125,6 +186,24 @@ export default function FinanceScreen() {
         };
         return methods[method] || method;
     };
+
+    const getCategoryOptions = () => [
+        { value: 'room_rental', label: 'Tiền phòng' },
+        { value: 'service', label: 'Dịch vụ' },
+        { value: 'supplies', label: 'Vật tư' },
+        { value: 'salary', label: 'Lương' },
+        { value: 'utilities', label: 'Tiện ích' },
+        { value: 'maintenance', label: 'Bảo trì' },
+    ];
+
+    if (loading && !refreshing) {
+        return (
+            <View style={[styles.container, styles.centerContent]}>
+                <ActivityIndicator size="large" color="#4a90e2" />
+                <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -148,7 +227,11 @@ export default function FinanceScreen() {
                 </View>
             </LinearGradient>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }>
                 {/* Period Filter */}
                 <View style={styles.periodFilter}>
                     {periods.map((period) => (
@@ -169,8 +252,34 @@ export default function FinanceScreen() {
                         </TouchableOpacity>
                     ))}
                 </View>
+                <View style={styles.filterSection}>
+                    <TouchableOpacity
+                        style={[
+                            styles.suppliesFilterButton,
+                            showSuppliesOnly && styles.suppliesFilterButtonActive
+                        ]}
+                        onPress={() => setShowSuppliesOnly(!showSuppliesOnly)}>
+                        <Ionicons
+                            name="cube-outline"
+                            size={20}
+                            color={showSuppliesOnly ? '#fff' : '#64748b'}
+                        />
+                        <Text style={[
+                            styles.suppliesFilterText,
+                            showSuppliesOnly && styles.suppliesFilterTextActive
+                        ]}>
+                            {showSuppliesOnly ? 'Đang xem chi phí kho' : 'Xem tất cả giao dịch'}
+                        </Text>
+                        {showSuppliesOnly && (
+                            <View style={styles.activeIndicator}>
+                                <Text style={styles.activeIndicatorText}>
+                                    {displayedTransactions.length}
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </View>
 
-                {/* Summary Cards */}
                 <View style={styles.summarySection}>
                     <View style={styles.summaryCard}>
                         <LinearGradient
@@ -182,7 +291,7 @@ export default function FinanceScreen() {
                             <View style={styles.summaryContent}>
                                 <Text style={styles.summaryLabel}>Thu nhập</Text>
                                 <Text style={styles.summaryValue}>
-                                    {totals.income.toLocaleString('vi-VN')}đ
+                                    {Number(summary.totalIncome).toLocaleString('vi-VN')}đ
                                 </Text>
                             </View>
                         </LinearGradient>
@@ -198,7 +307,7 @@ export default function FinanceScreen() {
                             <View style={styles.summaryContent}>
                                 <Text style={styles.summaryLabel}>Chi phí</Text>
                                 <Text style={styles.summaryValue}>
-                                    {totals.expense.toLocaleString('vi-VN')}đ
+                                    {Number(summary.totalExpense).toLocaleString('vi-VN')}đ
                                 </Text>
                             </View>
                         </LinearGradient>
@@ -210,83 +319,207 @@ export default function FinanceScreen() {
                                 <Ionicons
                                     name="wallet"
                                     size={24}
-                                    color={totals.profit >= 0 ? '#22c55e' : '#ef4444'}
+                                    color={Number(summary.profit) >= 0 ? '#22c55e' : '#ef4444'}
                                 />
                                 <Text style={styles.profitLabel}>Lợi nhuận</Text>
                             </View>
                             <Text
                                 style={[
                                     styles.profitValue,
-                                    { color: totals.profit >= 0 ? '#22c55e' : '#ef4444' },
+                                    { color: Number(summary.profit) >= 0 ? '#22c55e' : '#ef4444' },
                                 ]}>
-                                {totals.profit >= 0 ? '+' : ''}
-                                {totals.profit.toLocaleString('vi-VN')}đ
+                                {Number(summary.profit) >= 0 ? '+' : ''}
+                                {Number(summary.profit).toLocaleString('vi-VN')}đ
                             </Text>
                         </View>
                     </View>
                 </View>
 
-                {/* Transactions List */}
                 <View style={styles.transactionsSection}>
                     <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
 
-                    {transactions.map((transaction) => {
-                        const categoryInfo = getCategoryInfo(transaction.category);
-                        return (
-                            <View key={transaction.id} style={styles.transactionCard}>
-                                <View
-                                    style={[
-                                        styles.transactionIcon,
-                                        { backgroundColor: `${categoryInfo.color}20` },
-                                    ]}>
-                                    <Ionicons
-                                        name={categoryInfo.icon as any}
-                                        size={24}
-                                        color={categoryInfo.color}
-                                    />
-                                </View>
-
-                                <View style={styles.transactionDetails}>
-                                    <View style={styles.transactionHeader}>
-                                        <Text style={styles.transactionCategory}>
-                                            {categoryInfo.label}
-                                        </Text>
-                                        <Text
-                                            style={[
-                                                styles.transactionAmount,
-                                                transaction.type === 'income'
-                                                    ? styles.incomeAmount
-                                                    : styles.expenseAmount,
-                                            ]}>
-                                            {transaction.type === 'income' ? '+' : '-'}
-                                            {transaction.amount.toLocaleString('vi-VN')}đ
-                                        </Text>
+                    {transactions.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Ionicons name="document-text-outline" size={64} color="#cbd5e1" />
+                            <Text style={styles.emptyText}>Chưa có giao dịch nào</Text>
+                        </View>
+                    ) : (
+                        displayedTransactions.map((transaction) => {
+                            const categoryInfo = getCategoryInfo(transaction.category);
+                            return (
+                                <TouchableOpacity
+                                    key={transaction.id}
+                                    style={styles.transactionCard}
+                                    onLongPress={() => handleDeleteTransaction(transaction.id)}>
+                                    <View
+                                        style={[
+                                            styles.transactionIcon,
+                                            { backgroundColor: `${categoryInfo.color}20` },
+                                        ]}>
+                                        <Ionicons
+                                            name={categoryInfo.icon as any}
+                                            size={24}
+                                            color={categoryInfo.color}
+                                        />
                                     </View>
 
-                                    <Text style={styles.transactionDescription}>
-                                        {transaction.description}
-                                    </Text>
-
-                                    <View style={styles.transactionFooter}>
-                                        <View style={styles.transactionMeta}>
-                                            <Ionicons name="calendar-outline" size={14} color="#94a3b8" />
-                                            <Text style={styles.transactionMetaText}>
-                                                {transaction.date}
+                                    <View style={styles.transactionDetails}>
+                                        <View style={styles.transactionHeader}>
+                                            <Text style={styles.transactionCategory}>
+                                                {categoryInfo.label}
+                                            </Text>
+                                            <Text
+                                                style={[
+                                                    styles.transactionAmount,
+                                                    transaction.type === 'income'
+                                                        ? styles.incomeAmount
+                                                        : styles.expenseAmount,
+                                                ]}>
+                                                {transaction.type === 'income' ? '+' : '-'}
+                                                {transaction.amount.toLocaleString('vi-VN')}đ
                                             </Text>
                                         </View>
-                                        <View style={styles.transactionMeta}>
-                                            <Ionicons name="card-outline" size={14} color="#94a3b8" />
-                                            <Text style={styles.transactionMetaText}>
-                                                {getPaymentMethodLabel(transaction.paymentMethod)}
-                                            </Text>
+
+                                        <Text style={styles.transactionDescription}>
+                                            {transaction.description}
+                                        </Text>
+
+                                        <View style={styles.transactionFooter}>
+                                            <View style={styles.transactionMeta}>
+                                                <Ionicons name="calendar-outline" size={14} color="#94a3b8" />
+                                                <Text style={styles.transactionMetaText}>
+                                                    {transaction.date}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.transactionMeta}>
+                                                <Ionicons name="card-outline" size={14} color="#94a3b8" />
+                                                <Text style={styles.transactionMetaText}>
+                                                    {getPaymentMethodLabel(transaction.paymentMethod)}
+                                                </Text>
+                                            </View>
                                         </View>
                                     </View>
-                                </View>
-                            </View>
-                        );
-                    })}
+                                </TouchableOpacity>
+                            );
+                        })
+                    )}
                 </View>
             </ScrollView>
+
+            <Modal
+                visible={showAddModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowAddModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Thêm giao dịch mới</Text>
+                            <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                                <Ionicons name="close" size={28} color="#64748b" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <Text style={styles.inputLabel}>Loại giao dịch</Text>
+                            <View style={styles.typeSelector}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.typeButton,
+                                        formData.type === 'INCOME' && styles.typeButtonActiveIncome
+                                    ]}
+                                    onPress={() => setFormData({ ...formData, type: 'INCOME' })}>
+                                    <Text style={[
+                                        styles.typeButtonText,
+                                        formData.type === 'INCOME' && styles.typeButtonTextActive
+                                    ]}>Thu nhập</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.typeButton,
+                                        formData.type === 'EXPENSE' && styles.typeButtonActiveExpense
+                                    ]}
+                                    onPress={() => setFormData({ ...formData, type: 'EXPENSE' })}>
+                                    <Text style={[
+                                        styles.typeButtonText,
+                                        formData.type === 'EXPENSE' && styles.typeButtonTextActive
+                                    ]}>Chi phí</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.inputLabel}>Danh mục</Text>
+                            <View style={styles.categoryGrid}>
+                                {getCategoryOptions().map((cat) => (
+                                    <TouchableOpacity
+                                        key={cat.value}
+                                        style={[
+                                            styles.categoryItem,
+                                            formData.category === cat.value && styles.categoryItemActive
+                                        ]}
+                                        onPress={() => setFormData({ ...formData, category: cat.value })}>
+                                        <Text style={[
+                                            styles.categoryItemText,
+                                            formData.category === cat.value && styles.categoryItemTextActive
+                                        ]}>{cat.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={styles.inputLabel}>Số tiền</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Nhập số tiền"
+                                keyboardType="numeric"
+                                value={formData.amount}
+                                onChangeText={(text) => setFormData({ ...formData, amount: text })}
+                            />
+
+                            <Text style={styles.inputLabel}>Mô tả</Text>
+                            <TextInput
+                                style={[styles.input, styles.textArea]}
+                                placeholder="Nhập mô tả"
+                                multiline
+                                numberOfLines={3}
+                                value={formData.description}
+                                onChangeText={(text) => setFormData({ ...formData, description: text })}
+                            />
+
+                            <Text style={styles.inputLabel}>Phương thức thanh toán</Text>
+                            <View style={styles.paymentMethodSelector}>
+                                {[
+                                    { value: 'CASH', label: 'Tiền mặt', icon: 'cash' },
+                                    { value: 'TRANSFER', label: 'Chuyển khoản', icon: 'card' },
+                                    { value: 'CARD', label: 'Thẻ', icon: 'card-outline' },
+                                ].map((method) => (
+                                    <TouchableOpacity
+                                        key={method.value}
+                                        style={[
+                                            styles.paymentMethodButton,
+                                            formData.paymentMethod === method.value && styles.paymentMethodButtonActive
+                                        ]}
+                                        onPress={() => setFormData({ ...formData, paymentMethod: method.value as any })}>
+                                        <Ionicons
+                                            name={method.icon as any}
+                                            size={20}
+                                            color={formData.paymentMethod === method.value ? '#4a90e2' : '#64748b'}
+                                        />
+                                        <Text style={[
+                                            styles.paymentMethodText,
+                                            formData.paymentMethod === method.value && styles.paymentMethodTextActive
+                                        ]}>{method.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <TouchableOpacity
+                                style={styles.submitButton}
+                                onPress={handleCreateTransaction}>
+                                <Text style={styles.submitButtonText}>Thêm giao dịch</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -295,6 +528,15 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f8fafc',
+    },
+    centerContent: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#64748b',
     },
     header: {
         paddingTop: 50,
@@ -425,6 +667,15 @@ const styles = StyleSheet.create({
         color: '#1e293b',
         marginBottom: 12,
     },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    emptyText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#94a3b8',
+    },
     transactionCard: {
         flexDirection: 'row',
         backgroundColor: '#fff',
@@ -487,5 +738,191 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#94a3b8',
         fontWeight: '500',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 40,
+        maxHeight: '90%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1e293b',
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#475569',
+        marginBottom: 8,
+        marginTop: 16,
+    },
+    typeSelector: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    typeButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: '#f8fafc',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    typeButtonActiveIncome: {
+        backgroundColor: '#dcfce7',
+        borderColor: '#22c55e',
+    },
+    typeButtonActiveExpense: {
+        backgroundColor: '#fee2e2',
+        borderColor: '#ef4444',
+    },
+    typeButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#64748b',
+    },
+    typeButtonTextActive: {
+        color: '#1e293b',
+    },
+    categoryGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    categoryItem: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    categoryItemActive: {
+        backgroundColor: '#dbeafe',
+        borderColor: '#4a90e2',
+    },
+    categoryItemText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748b',
+    },
+    categoryItemTextActive: {
+        color: '#4a90e2',
+        fontWeight: '600',
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: '#1e293b',
+        backgroundColor: '#fff',
+    },
+    textArea: {
+        minHeight: 80,
+        textAlignVertical: 'top',
+    },
+    paymentMethodSelector: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    paymentMethodButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    paymentMethodButtonActive: {
+        backgroundColor: '#dbeafe',
+        borderColor: '#4a90e2',
+    },
+    paymentMethodText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748b',
+    },
+    paymentMethodTextActive: {
+        color: '#4a90e2',
+        fontWeight: '600',
+    },
+    submitButton: {
+        marginTop: 24,
+        backgroundColor: '#4a90e2',
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    submitButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#fff',
+    },
+    filterSection: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+    },
+    suppliesFilterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        backgroundColor: '#f8fafc',
+        borderWidth: 2,
+        borderColor: '#e2e8f0',
+    },
+    suppliesFilterButtonActive: {
+        backgroundColor: '#4a90e2',
+        borderColor: '#4a90e2',
+    },
+    suppliesFilterText: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#64748b',
+    },
+    suppliesFilterTextActive: {
+        color: '#fff',
+    },
+    activeIndicator: {
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        minWidth: 24,
+        alignItems: 'center',
+    },
+    activeIndicatorText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#fff',
     },
 });

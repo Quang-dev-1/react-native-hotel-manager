@@ -1,7 +1,10 @@
 import EditBookingModal, { UpdateBookingData } from '@/components/EditBookingModal';
 import bookingService, { Booking } from '@/services/bookingService';
+import financeService from '@/services/financeService';
+import historyService from '@/services/historyService';
 import hotelServiceAPI, { HotelService } from '@/services/hotelService';
 import roomService, { Room } from '@/services/roomService';
+import { styles } from '@/styles/rental.styles';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,11 +14,10 @@ import {
     Alert,
     Modal,
     ScrollView,
-    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 const ServiceModal = ({
@@ -33,6 +35,7 @@ const ServiceModal = ({
     const [selectedService, setSelectedService] = useState<HotelService | null>(null);
     const [quantity, setQuantity] = useState('1');
     const [loading, setLoading] = useState(false);
+
 
     useEffect(() => {
         if (visible && booking) {
@@ -55,6 +58,7 @@ const ServiceModal = ({
             setLoading(false);
         }
     };
+
 
     const handleSubmit = () => {
         if (!booking?.id) {
@@ -432,6 +436,8 @@ export default function RentalScreen() {
     const [showMenuModal, setShowMenuModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+    const [bookingsWithServices, setBookingsWithServices] = useState<{ [key: number]: any }>({});
+
 
     const { filter } = (route.params as { filter?: string }) || {};
 
@@ -454,19 +460,36 @@ export default function RentalScreen() {
         }, [route.params])
     );
 
+    const fetchBookingServices = async (bookingId: number) => {
+        try {
+            const bookingDetail = await bookingService.getBookingWithServices(bookingId);
+            setBookingsWithServices(prev => ({
+                ...prev,
+                [bookingId]: bookingDetail
+            }));
+        } catch (error) {
+            console.error('Error fetching services:', error);
+        }
+    };
+
     const fetchData = async () => {
         try {
             setLoading(true);
             const [roomsData, bookingsData] = await Promise.all([
                 roomService.getRooms(),
-                bookingService.getAllBookings(), // Lấy tất cả booking bao gồm CHECKED_OUT
+                bookingService.getAllBookings(),
             ]);
             setRooms(roomsData);
-            // Filter chỉ lấy các booking active và CHECKED_OUT (cần dọn)
             const activeBookings = bookingsData.filter(
                 b => ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'].includes(b.status)
             );
             setBookings(activeBookings);
+            const checkedInBookings = activeBookings.filter(b => b.status === 'CHECKED_IN');
+            for (const booking of checkedInBookings) {
+                if (booking.id) {
+                    await fetchBookingServices(booking.id);
+                }
+            }
         } catch (error: any) {
             Alert.alert('Lỗi', error.message || 'Không thể tải dữ liệu');
         } finally {
@@ -562,7 +585,7 @@ export default function RentalScreen() {
 
         Alert.alert(
             'Trả phòng',
-            `Xác nhận khách ${booking.customerName} đã trả phòng ${booking.roomNumber}?\n\nSau khi trả phòng, phòng sẽ chuyển sang trạng thái CẦN DỌN DẸP.`,
+            `Xác nhận khách ${booking.customerName} đã trả phòng ${booking.roomNumber}?\n\nSau khi trả phòng, phòng sẽ chuyển sang trạng thái CẦN DỌN DẸP và thông tin sẽ được lưu vào lịch sử.`,
             [
                 { text: 'Hủy', style: 'cancel' },
                 {
@@ -570,17 +593,66 @@ export default function RentalScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
+                            const bookingWithServices = await bookingService.getBookingWithServices(booking.id!);
+
                             await bookingService.checkOut(booking.id!);
 
                             const room = rooms.find(r => r.id === booking.roomId);
                             if (room?.id) {
                                 await roomService.updateRoomStatus(room.id, 'CLEANING');
                             }
+                            const remainingAmount = bookingWithServices.totalAmount - booking.deposit;
 
-                            Alert.alert('Thành công', 'Đã trả phòng và chuyển phòng sang trạng thái CẦN DỌN DẸP');
+                            if (remainingAmount > 0) {
+                                await financeService.createTransaction({
+                                    type: 'INCOME',
+                                    category: 'room_rental',
+                                    amount: remainingAmount,
+                                    description: `Thu tiền phòng ${booking.roomNumber} - ${booking.customerName}`,
+                                    transactionDate: new Date().toISOString().split('T')[0],
+                                    paymentMethod: 'CASH',
+                                    bookingId: booking.id
+                                });
+                            }
+
+                            if (booking.deposit > 0) {
+                                await financeService.createTransaction({
+                                    type: 'INCOME',
+                                    category: 'room_rental',
+                                    amount: booking.deposit,
+                                    description: `Tiền cọc phòng ${booking.roomNumber} - ${booking.customerName}`,
+                                    transactionDate: booking.checkIn,
+                                    paymentMethod: 'TRANSFER',
+                                    bookingId: booking.id
+                                });
+                            }
+
+                            const historyData = {
+                                bookingId: booking.id!,
+                                roomNumber: booking.roomNumber || '',
+                                customerName: booking.customerName,
+                                phone: booking.phone,
+                                checkIn: booking.checkIn,
+                                checkOut: booking.checkOut,
+                                actualCheckOut: new Date().toISOString().split('T')[0],
+                                nights: booking.nights,
+                                roomAmount: bookingWithServices.roomAmount,
+                                serviceAmount: bookingWithServices.serviceAmount,
+                                totalAmount: bookingWithServices.totalAmount,
+                                deposit: booking.deposit,
+                                notes: booking.notes,
+                            };
+
+                            await historyService.createHistory(historyData);
+
+                            Alert.alert(
+                                'Thành công',
+                                'Đã trả phòng, chuyển phòng sang trạng thái CẦN DỌN DẸP và lưu vào lịch sử'
+                            );
                             fetchData();
                         } catch (error: any) {
-                            Alert.alert('Lỗi', error.message);
+                            console.error('❌ Checkout error:', error);
+                            Alert.alert('Lỗi', error.message || 'Không thể trả phòng');
                         }
                     },
                 },
@@ -650,6 +722,7 @@ export default function RentalScreen() {
             console.log('🔵 handleAddService called with:', { bookingId, serviceId, quantity });
             await hotelServiceAPI.addServiceToBooking(bookingId, serviceId, quantity);
             Alert.alert('Thành công', 'Đã thêm dịch vụ vào booking');
+            await fetchBookingServices(bookingId);
             fetchData();
             setShowServiceModal(false);
             setSelectedBooking(null);
@@ -659,13 +732,36 @@ export default function RentalScreen() {
     };
 
     const handleChangeRoom = async (bookingId: number, newRoomId: number) => {
+        const currentBooking = bookings.find(b => b.id === bookingId);
         const newRoom = rooms.find(r => r.id === newRoomId);
+
+        if (!currentBooking || !newRoom) {
+            Alert.alert('Lỗi', 'Không tìm thấy thông tin phòng');
+            return;
+        }
+
         Alert.alert(
-            'Đổi phòng',
-            `Đã đổi sang phòng ${newRoom?.roomNumber}\n\n(Chức năng này cần implement API)`
+            'Xác nhận đổi phòng',
+            `Đổi từ phòng ${currentBooking.roomNumber} sang phòng ${newRoom.roomNumber}?\n\nPhòng cũ sẽ chuyển về trạng thái TRỐNG, phòng mới sẽ cập nhật theo trạng thái booking.`,
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Đổi phòng',
+                    onPress: async () => {
+                        try {
+                            await bookingService.changeRoom(bookingId, newRoomId);
+                            Alert.alert('Thành công', `Đã đổi sang phòng ${newRoom.roomNumber}`);
+                            fetchData();
+
+                            setShowChangeRoomModal(false);
+                            setSelectedBooking(null);
+                        } catch (error: any) {
+                            Alert.alert('Lỗi', error.message || 'Không thể đổi phòng');
+                        }
+                    },
+                },
+            ]
         );
-        setShowChangeRoomModal(false);
-        setSelectedBooking(null);
     };
 
     const getStatusColor = (status: string) => {
@@ -886,12 +982,57 @@ export default function RentalScreen() {
                                         {booking.checkIn} → {booking.checkOut}
                                     </Text>
                                 </View>
+                                {booking.status === 'CHECKED_IN' && bookingsWithServices[booking.id!] && (
+                                    <>
+                                        {bookingsWithServices[booking.id!].services &&
+                                            bookingsWithServices[booking.id!].services.length > 0 && (
+                                                <View style={styles.servicesSection}>
+                                                    <View style={styles.servicesSectionHeader}>
+                                                        <Ionicons name="cube-outline" size={14} color="#4a90e2" />
+                                                        <Text style={styles.servicesSectionTitle}>Dịch vụ:</Text>
+                                                    </View>
+                                                    {bookingsWithServices[booking.id!].services.map((service: any, index: number) => (
+                                                        <View key={index} style={styles.serviceItem}>
+                                                            <Text style={styles.serviceItemName}>
+                                                                • {service.serviceName} x{service.quantity}
+                                                            </Text>
+                                                            <Text style={styles.serviceItemPrice}>
+                                                                {service.totalPrice.toLocaleString('vi-VN')}đ
+                                                            </Text>
+                                                        </View>
+                                                    ))}
+                                                    <View style={styles.serviceTotalRow}>
+                                                        <Text style={styles.serviceTotalLabel}>Tổng DV:</Text>
+                                                        <Text style={styles.serviceTotalValue}>
+                                                            {bookingsWithServices[booking.id!].serviceAmount.toLocaleString('vi-VN')}đ
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            )}
+                                    </>
+                                )}
                                 <View style={styles.bookingInfo}>
                                     <Ionicons name="cash-outline" size={16} color="#4a90e2" />
                                     <Text style={styles.bookingPrice}>
-                                        {booking.totalAmount.toLocaleString('vi-VN')}đ
+                                        Tổng: {booking.totalAmount.toLocaleString('vi-VN')}đ
                                     </Text>
                                 </View>
+                                {booking.deposit > 0 && (
+                                    <View style={styles.bookingInfo}>
+                                        <Ionicons name="wallet-outline" size={16} color="#22c55e" />
+                                        <Text style={[styles.bookingInfoText, { color: '#22c55e', fontWeight: '600' }]}>
+                                            Đã cọc: {booking.deposit.toLocaleString('vi-VN')}đ
+                                        </Text>
+                                    </View>
+                                )}
+                                {booking.deposit > 0 && (
+                                    <View style={styles.bookingInfo}>
+                                        <Ionicons name="card-outline" size={16} color="#ef4444" />
+                                        <Text style={[styles.bookingInfoText, { color: '#ef4444', fontWeight: '600' }]}>
+                                            Còn thu: {(booking.totalAmount - booking.deposit).toLocaleString('vi-VN')}đ
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
 
                             {booking.status === 'PENDING' && (
@@ -1049,561 +1190,3 @@ export default function RentalScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f8fafc',
-    },
-    header: {
-        paddingTop: 50,
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-    },
-    headerTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    menuButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#fff',
-        flex: 1,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 32,
-    },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#64748b',
-        fontWeight: '500',
-    },
-    searchSection: {
-        backgroundColor: '#fff',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-    },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f8fafc',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        height: 48,
-        gap: 12,
-        marginBottom: 12,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 15,
-        color: '#1e293b',
-        fontWeight: '500',
-    },
-    filtersScroll: {
-        marginHorizontal: -16,
-    },
-    filtersContent: {
-        paddingHorizontal: 16,
-        gap: 8,
-    },
-    filterChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#f8fafc',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        marginRight: 8,
-    },
-    filterChipActive: {
-        backgroundColor: '#4a90e2',
-        borderColor: '#4a90e2',
-    },
-    filterText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#64748b',
-    },
-    filterTextActive: {
-        color: '#fff',
-    },
-    bookingsContent: {
-        padding: 16,
-    },
-    statsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    statItem: {
-        alignItems: 'center',
-    },
-    statNumber: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: 4,
-    },
-    statLabel: {
-        fontSize: 12,
-        color: '#64748b',
-        fontWeight: '500',
-    },
-    bookingHeader: {
-        marginBottom: 16,
-    },
-    bookingHeaderText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1e293b',
-    },
-    bookingCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        marginBottom: 12,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    bookingCardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 12,
-        backgroundColor: '#f8fafc',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-    },
-    bookingCardLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        flex: 1,
-    },
-    roomBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: '#eff6ff',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 8,
-    },
-    roomBadgeText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#4a90e2',
-    },
-    statusBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-    statusText: {
-        fontSize: 11,
-        fontWeight: '600',
-    },
-    moreButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#f8fafc',
-    },
-    bookingCardBody: {
-        padding: 12,
-        gap: 8,
-    },
-    bookingInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    bookingInfoText: {
-        fontSize: 14,
-        color: '#64748b',
-        fontWeight: '500',
-    },
-    bookingPrice: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#4a90e2',
-    },
-    bookingCardActions: {
-        flexDirection: 'row',
-        padding: 12,
-        gap: 8,
-        backgroundColor: '#f8fafc',
-        borderTopWidth: 1,
-        borderTopColor: '#e2e8f0',
-    },
-    actionButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 10,
-        borderRadius: 10,
-        borderWidth: 1.5,
-    },
-    actionButtonPrimary: {
-        backgroundColor: '#4a90e2',
-        borderColor: '#4a90e2',
-    },
-    actionButtonSecondary: {
-        backgroundColor: '#fff',
-        borderColor: '#4a90e2',
-    },
-    actionButtonSuccess: {
-        backgroundColor: '#22c55e',
-        borderColor: '#22c55e',
-    },
-    actionButtonWarning: {
-        backgroundColor: '#f59e0b',
-        borderColor: '#f59e0b',
-    },
-    actionButtonDanger: {
-        backgroundColor: '#fff',
-        borderColor: '#ef4444',
-    },
-    actionButtonPurple: {
-        backgroundColor: '#8b5cf6',
-        borderColor: '#8b5cf6',
-    },
-    actionButtonTextPrimary: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#fff',
-    },
-    actionButtonTextSecondary: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#4a90e2',
-    },
-    actionButtonTextDanger: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#ef4444',
-    },
-    emptyState: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 64,
-    },
-    emptyTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1e293b',
-        marginTop: 16,
-        marginBottom: 4,
-    },
-    emptySubtitle: {
-        fontSize: 14,
-        color: '#64748b',
-        textAlign: 'center',
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    serviceModalContainer: {
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        width: '90%',
-        maxWidth: 400,
-        maxHeight: '80%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 8,
-    },
-    changeRoomModalContainer: {
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        width: '90%',
-        maxWidth: 400,
-        maxHeight: '70%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 8,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1e293b',
-    },
-    modalScrollView: {
-        maxHeight: 400,
-    },
-    modalBody: {
-        padding: 20,
-    },
-    bookingInfoBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        backgroundColor: '#f8fafc',
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 20,
-    },
-    bookingInfoBoxText: {
-        flex: 1,
-    },
-    bookingInfoBoxTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: 2,
-    },
-    bookingInfoBoxSubtitle: {
-        fontSize: 14,
-        color: '#64748b',
-        fontWeight: '500',
-    },
-    sectionTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#64748b',
-        marginBottom: 12,
-    },
-    serviceOption: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#f8fafc',
-        borderRadius: 12,
-        marginBottom: 12,
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    serviceOptionSelected: {
-        backgroundColor: '#eff6ff',
-        borderColor: '#4a90e2',
-    },
-    serviceOptionLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        flex: 1,
-    },
-    serviceOptionInfo: {
-        flex: 1,
-    },
-    serviceOptionName: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: 2,
-    },
-    serviceOptionDesc: {
-        fontSize: 13,
-        color: '#64748b',
-        fontWeight: '500',
-    },
-    serviceOptionPrice: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#4a90e2',
-    },
-    inputGroup: {
-        marginTop: 16,
-    },
-    inputLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#64748b',
-        marginBottom: 8,
-    },
-    modalInput: {
-        backgroundColor: '#f8fafc',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontSize: 15,
-        color: '#1e293b',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-    },
-    modalActions: {
-        flexDirection: 'row',
-        gap: 12,
-        padding: 20,
-        borderTopWidth: 1,
-        borderTopColor: '#e2e8f0',
-    },
-    cancelButton: {
-        flex: 1,
-        paddingVertical: 14,
-        borderRadius: 12,
-        backgroundColor: '#f8fafc',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-    },
-    cancelButtonText: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#64748b',
-    },
-    submitButton: {
-        flex: 1,
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-    submitButtonDisabled: {
-        opacity: 0.5,
-    },
-    submitButtonGradient: {
-        paddingVertical: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    submitButtonText: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#fff',
-    },
-    currentRoomInfo: {
-        backgroundColor: '#f8fafc',
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 20,
-    },
-    currentRoomLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#64748b',
-        marginBottom: 4,
-    },
-    currentRoomValue: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1e293b',
-    },
-    emptyText: {
-        fontSize: 14,
-        color: '#94a3b8',
-        textAlign: 'center',
-        paddingVertical: 32,
-    },
-    roomOption: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#f8fafc',
-        borderRadius: 12,
-        marginBottom: 12,
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    roomOptionSelected: {
-        backgroundColor: '#eff6ff',
-        borderColor: '#4a90e2',
-    },
-    roomOptionLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        flex: 1,
-    },
-    roomOptionNumber: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: 2,
-    },
-    roomOptionType: {
-        fontSize: 13,
-        color: '#64748b',
-        fontWeight: '500',
-    },
-    roomOptionPrice: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#4a90e2',
-    },
-    menuModalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    menuModalContainer: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        width: 220,
-        paddingVertical: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 8,
-    },
-    menuItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-    },
-    menuItemText: {
-        fontSize: 15,
-        fontWeight: '500',
-        color: '#1e293b',
-    },
-    menuDivider: {
-        height: 1,
-        backgroundColor: '#e2e8f0',
-        marginVertical: 4,
-    },
-});

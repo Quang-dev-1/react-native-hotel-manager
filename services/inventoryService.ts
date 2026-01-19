@@ -1,4 +1,5 @@
 import apiClient from './api';
+import financeService from './financeService';
 
 export interface Inventory {
   id?: number;
@@ -19,8 +20,39 @@ export interface InventoryStats {
 }
 
 class InventoryService {
-  // ============ INVENTORY APIs ============
-  
+  async addStockWithTransaction(
+    id: number,
+    addQuantity: number,
+    paymentMethod: 'CASH' | 'TRANSFER' | 'CARD' = 'CASH'
+  ): Promise<void> {
+    try {
+      console.log('📦 Adding stock with transaction for item:', id);
+
+      const item = await this.getInventoryById(id);
+
+      const newQuantity = item.quantity + addQuantity;
+
+      await this.updateStock(id, newQuantity);
+
+      const totalCost = addQuantity * item.price;
+      await financeService.createTransaction({
+        type: 'EXPENSE',
+        category: 'supplies',
+        amount: totalCost,
+        description: `Nhập kho: ${item.name} - ${addQuantity} ${item.unit}`,
+        transactionDate: new Date().toISOString().split('T')[0],
+        paymentMethod: paymentMethod
+      });
+
+      console.log('✅ Stock and transaction added successfully');
+    } catch (error: any) {
+      console.error('❌ Add stock with transaction error:', error);
+      const message = error.response?.data?.message ||
+        error.message ||
+        'Không thể nhập hàng và ghi nhận chi phí';
+      throw new Error(message);
+    }
+  }
   async getAllInventory(): Promise<Inventory[]> {
     try {
       console.log('📋 Fetching all inventory...');
@@ -29,9 +61,9 @@ class InventoryService {
       return response.data;
     } catch (error: any) {
       console.error('❌ Get inventory error:', error);
-      const message = error.response?.data?.message || 
-                      error.message || 
-                      'Không thể lấy danh sách hàng tồn kho';
+      const message = error.response?.data?.message ||
+        error.message ||
+        'Không thể lấy danh sách hàng tồn kho';
       throw new Error(message);
     }
   }
@@ -44,9 +76,9 @@ class InventoryService {
       return response.data;
     } catch (error: any) {
       console.error('❌ Get inventory by id error:', error);
-      const message = error.response?.data?.message || 
-                      error.message || 
-                      'Không thể lấy thông tin hàng tồn kho';
+      const message = error.response?.data?.message ||
+        error.message ||
+        'Không thể lấy thông tin hàng tồn kho';
       throw new Error(message);
     }
   }
@@ -59,9 +91,9 @@ class InventoryService {
       return response.data;
     } catch (error: any) {
       console.error('❌ Get inventory by category error:', error);
-      const message = error.response?.data?.message || 
-                      error.message || 
-                      'Không thể lấy hàng tồn kho theo danh mục';
+      const message = error.response?.data?.message ||
+        error.message ||
+        'Không thể lấy hàng tồn kho theo danh mục';
       throw new Error(message);
     }
   }
@@ -74,9 +106,9 @@ class InventoryService {
       return response.data;
     } catch (error: any) {
       console.error('❌ Get low stock items error:', error);
-      const message = error.response?.data?.message || 
-                      error.message || 
-                      'Không thể lấy hàng sắp hết';
+      const message = error.response?.data?.message ||
+        error.message ||
+        'Không thể lấy hàng sắp hết';
       throw new Error(message);
     }
   }
@@ -84,24 +116,24 @@ class InventoryService {
   async addInventory(data: Inventory): Promise<Inventory> {
     try {
       console.log('➕ Adding inventory:', data.name);
-      
+
       // Validate dữ liệu trước khi gửi
       if (!data.name || !data.category || !data.unit) {
         throw new Error('Vui lòng điền đầy đủ thông tin bắt buộc');
       }
-      
+
       if (data.quantity < 0 || data.minStock < 0 || data.price < 0) {
         throw new Error('Số lượng và giá phải là số dương');
       }
-      
+
       const response = await apiClient.post<Inventory>('/inventory', data);
       console.log('✅ Inventory added successfully:', response.data.name);
       return response.data;
     } catch (error: any) {
       console.error('❌ Add inventory error:', error.response?.data || error);
-      const message = error.response?.data?.message || 
-                      error.message || 
-                      'Không thể thêm hàng tồn kho';
+      const message = error.response?.data?.message ||
+        error.message ||
+        'Không thể thêm hàng tồn kho';
       throw new Error(message);
     }
   }
@@ -109,23 +141,23 @@ class InventoryService {
   async updateInventory(id: number, data: Inventory): Promise<Inventory> {
     try {
       console.log('🔄 Updating inventory:', id, data.name);
-      
+
       if (!data.name || !data.category || !data.unit) {
         throw new Error('Vui lòng điền đầy đủ thông tin bắt buộc');
       }
-      
+
       if (data.quantity < 0 || data.minStock < 0 || data.price < 0) {
         throw new Error('Số lượng và giá phải là số dương');
       }
-      
+
       const response = await apiClient.put<Inventory>(`/inventory/${id}`, data);
       console.log('✅ Inventory updated successfully');
       return response.data;
     } catch (error: any) {
       console.error('❌ Update inventory error:', error);
-      const message = error.response?.data?.message || 
-                      error.message || 
-                      'Không thể cập nhật hàng tồn kho';
+      const message = error.response?.data?.message ||
+        error.message ||
+        'Không thể cập nhật hàng tồn kho';
       throw new Error(message);
     }
   }
@@ -133,20 +165,20 @@ class InventoryService {
   async updateStock(id: number, quantity: number): Promise<void> {
     try {
       console.log('📦 Updating stock:', id, 'new quantity:', quantity);
-      
+
       if (quantity < 0) {
         throw new Error('Số lượng không thể âm');
       }
-      
+
       await apiClient.put(`/inventory/${id}/stock`, null, {
         params: { quantity }
       });
       console.log('✅ Stock updated successfully');
     } catch (error: any) {
       console.error('❌ Update stock error:', error);
-      const message = error.response?.data?.message || 
-                      error.message || 
-                      'Không thể cập nhật số lượng';
+      const message = error.response?.data?.message ||
+        error.message ||
+        'Không thể cập nhật số lượng';
       throw new Error(message);
     }
   }
@@ -158,15 +190,15 @@ class InventoryService {
       console.log('✅ Inventory deleted successfully');
     } catch (error: any) {
       console.error('❌ Delete inventory error:', error);
-      const message = error.response?.data?.message || 
-                      error.message || 
-                      'Không thể xóa hàng tồn kho';
+      const message = error.response?.data?.message ||
+        error.message ||
+        'Không thể xóa hàng tồn kho';
       throw new Error(message);
     }
   }
 
   // ============ UTILITY METHODS ============
-  
+
   /**
    * Tính toán thống kê kho hàng
    */
@@ -181,12 +213,12 @@ class InventoryService {
     inventory.forEach(item => {
       // Tổng giá trị
       stats.totalValue += item.quantity * item.price;
-      
+
       // Đếm hàng sắp hết
       if (item.quantity <= item.minStock) {
         stats.lowStockCount++;
       }
-      
+
       // Đếm theo danh mục
       if (!stats.categories[item.category]) {
         stats.categories[item.category] = 0;
@@ -201,7 +233,7 @@ class InventoryService {
    * Lọc hàng tồn kho theo điều kiện
    */
   filterInventory(
-    inventory: Inventory[], 
+    inventory: Inventory[],
     filters: {
       search?: string;
       category?: string;
@@ -239,7 +271,7 @@ class InventoryService {
    * Sắp xếp hàng tồn kho
    */
   sortInventory(
-    inventory: Inventory[], 
+    inventory: Inventory[],
     sortBy: 'name' | 'quantity' | 'price' | 'lastUpdated',
     order: 'asc' | 'desc' = 'asc'
   ): Inventory[] {

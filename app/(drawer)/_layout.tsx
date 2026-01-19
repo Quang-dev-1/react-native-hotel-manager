@@ -21,6 +21,9 @@ import ProfileScreen from '../(drawer)/profile';
 import RentalScreen from '../(drawer)/rental';
 import FinanceScreen from './finance';
 import LogsScreen from './logs';
+import PaymentScreen from './PaymentScreen';
+import RoomTypesScreen from './room-types';
+import RoomsScreen from './rooms';
 import ServicesScreen from './services';
 import SystemScreen from './system';
 import WarehouseScreen from './warehouse';
@@ -122,7 +125,6 @@ function CustomDrawerContent() {
     <LinearGradient
       colors={['#5da9e9', '#4a90e2']}
       style={styles.drawerContainer}>
-      {/* User Profile Section */}
       <View style={styles.profileSection}>
         <View style={styles.hotelIconWrapper}>
           <Image
@@ -139,7 +141,6 @@ function CustomDrawerContent() {
         </View>
       </View>
 
-      {/* Menu Items */}
       <View style={styles.menuContainer}>
         {menuItems.map((item, index) => (
           <TouchableOpacity
@@ -154,7 +155,6 @@ function CustomDrawerContent() {
         ))}
       </View>
 
-      {/* Logout Button */}
       <TouchableOpacity
         style={styles.logoutSection}
         onPress={handleLogout}
@@ -164,7 +164,6 @@ function CustomDrawerContent() {
         <Ionicons name="chevron-forward" size={18} color="#dbeafe" />
       </TouchableOpacity>
 
-      {/* Contact Section */}
       <View style={styles.contactSection}>
         <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
         <Text style={styles.contactText}>0367470332</Text>
@@ -196,9 +195,13 @@ export default function DrawerLayout() {
           <Drawer.Screen name="system" component={SystemScreen} />
           <Drawer.Screen name="logs" component={LogsScreen} />
           <Drawer.Screen name="services" component={ServicesScreen} />
+          <Drawer.Screen name="rooms" component={RoomsScreen} />
+          <Drawer.Screen name="room-types" component={RoomTypesScreen} />
+          <Drawer.Screen name="PaymentScreen" component={PaymentScreen} />
         </Drawer.Navigator>
       </BookingProvider>
     </RoomProvider>
+
   );
 }
 

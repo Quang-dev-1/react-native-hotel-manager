@@ -1,4 +1,5 @@
 import bookingService, { Booking } from '@/services/bookingService';
+import financeService from '@/services/financeService';
 import roomService, { Room } from '@/services/roomService';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -15,7 +16,6 @@ import {
     View,
 } from 'react-native';
 
-// Modal xem chi tiết booking
 const BookingDetailModal = ({
     visible,
     booking,
@@ -146,12 +146,24 @@ const BookingDetailModal = ({
                                         {booking.totalAmount.toLocaleString('vi-VN')}đ
                                     </Text>
                                 </View>
-                                <View style={styles.depositRow}>
-                                    <Text style={styles.depositLabel}>Đã đặt cọc:</Text>
-                                    <Text style={styles.depositValue}>
-                                        {booking.deposit.toLocaleString('vi-VN')}đ
-                                    </Text>
-                                </View>
+                                {booking.deposit > 0 && (
+                                    <View style={styles.depositRow}>
+                                        <Text style={styles.depositLabel}>Đã đặt cọc:</Text>
+                                        <Text style={[styles.depositValue, { color: '#22c55e' }]}>
+                                            -{booking.deposit.toLocaleString('vi-VN')}đ
+                                        </Text>
+                                    </View>
+                                )}
+                                {booking.deposit > 0 && (
+                                    <View style={styles.depositRow}>
+                                        <Text style={[styles.depositLabel, { fontWeight: '700', color: '#1e293b' }]}>
+                                            Còn phải thu:
+                                        </Text>
+                                        <Text style={[styles.totalPriceDetail, { fontSize: 18 }]}>
+                                            {(booking.totalAmount - booking.deposit).toLocaleString('vi-VN')}đ
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
 
                             {booking.notes && (
@@ -404,8 +416,37 @@ export default function BookingsScreen() {
                 style: 'destructive',
                 onPress: async () => {
                     try {
-                        await bookingService.checkOut(id);
+                        const booking = bookings.find(b => b.id === id);
+                        if (!booking) return;
 
+                        const bookingWithServices = await bookingService.getBookingWithServices(id);
+
+                        await bookingService.checkOut(id);
+                        const remainingAmount = bookingWithServices.totalAmount - booking.deposit;
+
+                        if (remainingAmount > 0) {
+                            await financeService.createTransaction({
+                                type: 'INCOME',
+                                category: 'room_rental',
+                                amount: remainingAmount,
+                                description: `Thu tiền phòng ${roomNumber} - ${booking.customerName}`,
+                                transactionDate: new Date().toISOString().split('T')[0],
+                                paymentMethod: 'CASH',
+                                bookingId: id
+                            });
+                        }
+
+                        if (booking.deposit > 0) {
+                            await financeService.createTransaction({
+                                type: 'INCOME',
+                                category: 'room_rental',
+                                amount: booking.deposit,
+                                description: `Tiền cọc phòng ${roomNumber} - ${booking.customerName}`,
+                                transactionDate: booking.checkIn,
+                                paymentMethod: 'TRANSFER',
+                                bookingId: id
+                            });
+                        }
                         Alert.alert('Thành công', 'Đã trả phòng thành công', [
                             {
                                 text: 'OK',

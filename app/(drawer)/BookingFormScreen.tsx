@@ -335,18 +335,15 @@ export default function BookingFormScreen() {
         return room.price * calculateNights();
     };
 
-    // Kiểm tra xem khoảng thời gian có trùng với booking đã có không
     const checkDateOverlap = (checkIn: string, checkOut: string): boolean => {
         const checkInDate = new Date(checkIn);
         const checkOutDate = new Date(checkOut);
 
-        // Tạo array các ngày trong khoảng checkin -> checkout
         const datesInRange: string[] = [];
         for (let d = new Date(checkInDate); d < checkOutDate; d.setDate(d.getDate() + 1)) {
             datesInRange.push(d.toISOString().split('T')[0]);
         }
 
-        // Kiểm tra xem có ngày nào trùng với bookedDates không
         return datesInRange.some(date => bookedDates.includes(date));
     };
 

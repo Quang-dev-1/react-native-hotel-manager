@@ -69,7 +69,7 @@ export default function ServicesScreen() {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
+                <TouchableOpacity onPress={() => router.push('/system')}>
                     <Ionicons name="arrow-back" size={24} color="#1e293b" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Dịch vụ khách sạn</Text>
@@ -94,7 +94,7 @@ export default function ServicesScreen() {
             <AddServiceModal
                 visible={showAddModal}
                 onClose={() => setShowAddModal(false)}
-                onSuccess={() => fetchServices()} // QUAN TRỌNG: Load lại sau khi thêm
+                onSuccess={() => fetchServices()}
             />
         </View>
     );

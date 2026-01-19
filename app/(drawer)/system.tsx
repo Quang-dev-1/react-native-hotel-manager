@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useRouter } from 'expo-router'; // Dùng useNavigation của expo-router để mở Drawer
+import { useNavigation, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AddRoomModal from '../../components/AddRoomModal';
@@ -13,10 +13,8 @@ const CARD_WIDTH = (width - 48) / 2;
 
 export default function SystemScreen() {
     const router = useRouter();
-    // Sử dụng useNavigation của expo-router để điều khiển Drawer
     const navigation = useNavigation();
 
-    // Modal states
     const [showRoomModal, setShowRoomModal] = useState(false);
     const [showRoomTypeModal, setShowRoomTypeModal] = useState(false);
     const [showServiceModal, setShowServiceModal] = useState(false);
@@ -29,7 +27,7 @@ export default function SystemScreen() {
             icon: 'bed',
             color: '#3b82f6',
             bgColor: '#dbeafe',
-            onPress: () => setShowRoomModal(true),
+            onPress: () => router.push('/rooms'),
         },
         {
             id: 'add-room-type',
@@ -38,7 +36,7 @@ export default function SystemScreen() {
             icon: 'pricetag',
             color: '#8b5cf6',
             bgColor: '#ede9fe',
-            onPress: () => setShowRoomTypeModal(true),
+            onPress: () => router.push('/room-types'),
         },
         {
             id: 'add-service',
@@ -65,7 +63,7 @@ export default function SystemScreen() {
             icon: 'time',
             color: '#f59e0b',
             bgColor: '#fef3c7',
-            onPress: () => Alert.alert('Lịch sử', 'Chức năng đang phát triển'),
+            onPress: () => router.push('/logs'),
         },
         {
             id: 'statistics',
