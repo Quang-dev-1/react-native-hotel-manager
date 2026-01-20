@@ -3,6 +3,7 @@ import { Room } from '@/services/roomService';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -217,6 +218,7 @@ export default function BookingFormScreen() {
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
     const [bookedDates, setBookedDates] = useState<string[]>([]);
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash');
 
     const [errors, setErrors] = useState({
         customerName: '',
@@ -269,8 +271,14 @@ export default function BookingFormScreen() {
     };
 
     const validateDeposit = (text: string) => {
+        if (paymentMethod === 'online' && !text) {
+            return 'Vui lòng nhập số tiền cọc khi thanh toán online';
+        }
         if (text && isNaN(Number(text))) return 'Tiền cọc phải là số';
         if (text && Number(text) < 0) return 'Tiền cọc không thể âm';
+        if (paymentMethod === 'online' && Number(text) < 10000) {
+            return 'Số tiền tối thiểu là 10,000đ';
+        }
         return '';
     };
 
@@ -347,6 +355,7 @@ export default function BookingFormScreen() {
         return datesInRange.some(date => bookedDates.includes(date));
     };
 
+
     const handleSubmitBooking = async () => {
         const nameError = validateCustomerName(customerName);
         const phoneError = validatePhone(phone);
@@ -379,7 +388,6 @@ export default function BookingFormScreen() {
             return;
         }
 
-        // Kiểm tra trùng ngày
         const checkInStr = formatDateForAPI(checkInDate);
         const checkOutStr = formatDateForAPI(checkOutDate);
 
@@ -409,29 +417,67 @@ export default function BookingFormScreen() {
                 phone: phone.trim(),
                 checkIn: checkInStr,
                 checkOut: checkOutStr,
-                deposit: depositAmount,
+                deposit: 0,
                 notes: notes.trim(),
             };
 
             console.log('📤 Submitting booking:', bookingData);
 
-            await bookingService.createBooking(bookingData);
+            const newBooking = await bookingService.createBooking(bookingData);
 
-            // Kiểm tra xem có booking đang active không để thông báo cho user
-            const activeBookings = await bookingService.getActiveBookings();
-            const hasActiveBooking = activeBookings.some(
-                b => b.roomId === room.id && b.status === 'CHECKED_IN'
-            );
+            if (paymentMethod === 'online' && depositAmount > 0) {
+                router.push({
+                    pathname: '/(drawer)/PaymentScreen',
+                    params: {
+                        bookingId: newBooking.id!.toString(),
+                        depositAmount: depositAmount.toString(),
+                        customerName: customerName.trim(),
+                        roomNumber: room.roomNumber,
+                    }
+                });
+            }
+            else if (paymentMethod === 'cash' && depositAmount > 0) {
+                // Cập nhật deposit cho booking
+                await bookingService.updateBooking(newBooking.id!, {
+                    customerName: customerName.trim(),
+                    phone: phone.trim(),
+                    checkIn: checkInStr,
+                    checkOut: checkOutStr,
+                    deposit: depositAmount,
+                    notes: notes.trim(),
+                });
 
-            const statusMessage = hasActiveBooking
-                ? 'Booking đã được tạo với trạng thái CHỜ XÁC NHẬN.\n\nLưu ý: Phòng này đang có khách đang ở. Bạn chỉ có thể xác nhận booking này sau khi khách hiện tại trả phòng.'
-                : 'Booking đã được tạo thành công!';
+                const activeBookings = await bookingService.getActiveBookings();
+                const hasActiveBooking = activeBookings.some(
+                    b => b.roomId === room.id && b.status === 'CHECKED_IN'
+                );
 
-            Alert.alert(
-                'Thành công',
-                `${statusMessage}\n\nThông tin:\n• Số đêm: ${nights} đêm\n• Tổng tiền: ${totalAmount.toLocaleString('vi-VN')}đ\n• Đặt cọc: ${depositAmount.toLocaleString('vi-VN')}đ`,
-                [{ text: 'OK', onPress: () => navigation.goBack() }]
-            );
+                const statusMessage = hasActiveBooking
+                    ? 'Booking đã được tạo với trạng thái CHỜ XÁC NHẬN.\n\nLưu ý: Phòng này đang có khách đang ở. Bạn chỉ có thể xác nhận booking này sau khi khách hiện tại trả phòng.'
+                    : 'Booking đã được tạo thành công!';
+
+                Alert.alert(
+                    'Thành công',
+                    `${statusMessage}\n\nThông tin:\n• Số đêm: ${nights} đêm\n• Tổng tiền: ${totalAmount.toLocaleString('vi-VN')}đ\n• Đặt cọc: ${depositAmount.toLocaleString('vi-VN')}đ`,
+                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                );
+            }
+            else {
+                const activeBookings = await bookingService.getActiveBookings();
+                const hasActiveBooking = activeBookings.some(
+                    b => b.roomId === room.id && b.status === 'CHECKED_IN'
+                );
+
+                const statusMessage = hasActiveBooking
+                    ? 'Booking đã được tạo với trạng thái CHỜ XÁC NHẬN.\n\nLưu ý: Phòng này đang có khách đang ở. Bạn chỉ có thể xác nhận booking này sau khi khách hiện tại trả phòng.'
+                    : 'Booking đã được tạo thành công!';
+
+                Alert.alert(
+                    'Thành công',
+                    `${statusMessage}\n\nThông tin:\n• Số đêm: ${nights} đêm\n• Tổng tiền: ${totalAmount.toLocaleString('vi-VN')}đ`,
+                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                );
+            }
         } catch (error: any) {
             console.error('❌ Booking error:', error);
             Alert.alert('Lỗi', error.message || 'Không thể tạo đặt phòng. Vui lòng thử lại.');
@@ -559,12 +605,82 @@ export default function BookingFormScreen() {
                 )}
 
                 <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Tiền trả trước (đặt cọc)</Text>
+                    <Text style={styles.inputLabel}>
+                        Phương thức thanh toán cọc <Text style={styles.required}>*</Text>
+                    </Text>
+                    <View style={styles.paymentMethodContainer}>
+                        <TouchableOpacity
+                            style={[
+                                styles.paymentMethodOption,
+                                paymentMethod === 'cash' && styles.paymentMethodActive
+                            ]}
+                            onPress={() => setPaymentMethod('cash')}
+                            disabled={loading}>
+                            <View style={styles.paymentMethodContent}>
+                                <Ionicons
+                                    name="cash-outline"
+                                    size={24}
+                                    color={paymentMethod === 'cash' ? '#4a90e2' : '#64748b'}
+                                />
+                                <View style={styles.paymentMethodText}>
+                                    <Text style={[
+                                        styles.paymentMethodTitle,
+                                        paymentMethod === 'cash' && styles.paymentMethodTitleActive
+                                    ]}>
+                                        Tiền mặt
+                                    </Text>
+                                    <Text style={styles.paymentMethodDesc}>
+                                        Thanh toán trực tiếp
+                                    </Text>
+                                </View>
+                            </View>
+                            {paymentMethod === 'cash' && (
+                                <Ionicons name="checkmark-circle" size={24} color="#4a90e2" />
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.paymentMethodOption,
+                                paymentMethod === 'online' && styles.paymentMethodActive
+                            ]}
+                            onPress={() => setPaymentMethod('online')}
+                            disabled={loading}>
+                            <View style={styles.paymentMethodContent}>
+                                <Ionicons
+                                    name="card-outline"
+                                    size={24}
+                                    color={paymentMethod === 'online' ? '#4a90e2' : '#64748b'}
+                                />
+                                <View style={styles.paymentMethodText}>
+                                    <Text style={[
+                                        styles.paymentMethodTitle,
+                                        paymentMethod === 'online' && styles.paymentMethodTitleActive
+                                    ]}>
+                                        Chuyển khoản
+                                    </Text>
+                                    <Text style={styles.paymentMethodDesc}>
+                                        Quét mã QR PayOS
+                                    </Text>
+                                </View>
+                            </View>
+                            {paymentMethod === 'online' && (
+                                <Ionicons name="checkmark-circle" size={24} color="#4a90e2" />
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>
+                        Tiền trả trước (đặt cọc)
+                        {paymentMethod === 'online' && <Text style={styles.required}> *</Text>}
+                    </Text>
                     <View style={[styles.inputWrapper, errors.deposit ? styles.inputError : null]}>
                         <Ionicons name="cash-outline" size={20} color="#64748b" />
                         <TextInput
                             style={styles.input}
-                            placeholder="Nhập số tiền đặt cọc"
+                            placeholder={paymentMethod === 'online' ? 'Nhập số tiền cọc (tối thiểu 10,000đ)' : 'Nhập số tiền đặt cọc'}
                             value={deposit}
                             onChangeText={handleDepositChange}
                             keyboardType="numeric"
@@ -574,6 +690,14 @@ export default function BookingFormScreen() {
                         <Text style={styles.currency}>đ</Text>
                     </View>
                     {errors.deposit ? <Text style={styles.errorText}>{errors.deposit}</Text> : null}
+                    {paymentMethod === 'online' && (
+                        <View style={styles.infoBox}>
+                            <Ionicons name="information-circle" size={16} color="#4a90e2" />
+                            <Text style={styles.infoText}>
+                                Bạn sẽ được chuyển đến trang thanh toán PayOS để quét mã QR
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 <View style={styles.roomInfoCard}>
@@ -644,7 +768,7 @@ export default function BookingFormScreen() {
                             <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
                         )}
                         <Text style={styles.submitBtnText}>
-                            {loading ? 'Đang xử lý...' : 'Xác nhận đặt phòng'}
+                            {loading ? 'Đang xử lý...' : (paymentMethod === 'online' ? 'Tiếp tục thanh toán' : 'Xác nhận đặt phòng')}
                         </Text>
                     </LinearGradient>
                 </TouchableOpacity>
@@ -822,6 +946,62 @@ const styles = StyleSheet.create({
         fontSize: 18,
         color: '#4a90e2',
         fontWeight: '700'
+    },
+    paymentMethodContainer: {
+        gap: 12
+    },
+    paymentMethodOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 2,
+        borderColor: '#e2e8f0'
+    },
+    paymentMethodActive: {
+        borderColor: '#4a90e2',
+        backgroundColor: '#eff6ff'
+    },
+    paymentMethodContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flex: 1
+    },
+    paymentMethodText: {
+        flex: 1
+    },
+    paymentMethodTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1e293b',
+        marginBottom: 2
+    },
+    paymentMethodTitleActive: {
+        color: '#4a90e2'
+    },
+    paymentMethodDesc: {
+        fontSize: 13,
+        color: '#64748b'
+    },
+    infoBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#eff6ff',
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 8,
+        borderWidth: 1,
+        borderColor: '#bfdbfe'
+    },
+    infoText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#1e40af',
+        lineHeight: 18
     },
     textAreaWrapper: {
         alignItems: 'flex-start',

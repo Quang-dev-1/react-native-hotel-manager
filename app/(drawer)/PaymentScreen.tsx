@@ -121,22 +121,24 @@ export default function PaymentScreen() {
             if (response.isPaid) {
                 setPaymentStatus('success');
                 Alert.alert(
-                    'Thanh toán thành công!',
+                    '✅ Thanh toán thành công!',
                     `Đã nhận được ${PaymentService.formatCurrency(response.paidAmount)}\n\nBooking của bạn đã được xác nhận.`,
                     [
                         {
                             text: 'Đóng',
                             onPress: () => {
-                                // Quay về màn hình bookings
-                                navigation.navigate('bookings' as never);
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'bookings' as never }],
+                                });
                             }
                         }
                     ]
                 );
             } else {
                 Alert.alert(
-                    'Chưa nhận được thanh toán',
-                    'Hệ thống chưa phát hiện giao dịch. Vui lòng kiểm tra lại hoặc liên hệ hỗ trợ.',
+                    '⏳ Chưa nhận được thanh toán',
+                    'Hệ thống chưa phát hiện giao dịch.\n\nVui lòng đợi 1-2 phút sau khi chuyển khoản và thử lại.',
                     [
                         {
                             text: 'Kiểm tra lại',
@@ -144,7 +146,8 @@ export default function PaymentScreen() {
                         },
                         {
                             text: 'Đóng',
-                            style: 'cancel'
+                            style: 'cancel',
+                            onPress: () => setVerifying(false)
                         }
                     ]
                 );
@@ -153,7 +156,13 @@ export default function PaymentScreen() {
             console.error('❌ Payment verification error:', error);
             Alert.alert(
                 'Lỗi kiểm tra thanh toán',
-                error.message || 'Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại.'
+                error.message || 'Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại.',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => setVerifying(false)
+                    }
+                ]
             );
         } finally {
             setVerifying(false);
@@ -172,7 +181,12 @@ export default function PaymentScreen() {
                 {
                     text: 'Hủy',
                     style: 'destructive',
-                    onPress: () => navigation.navigate('bookings' as never)
+                    onPress: () => {
+                        navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'bookings' as never }],
+                        });
+                    }
                 }
             ]
         );

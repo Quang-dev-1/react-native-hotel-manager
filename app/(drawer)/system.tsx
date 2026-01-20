@@ -48,15 +48,6 @@ export default function SystemScreen() {
             onPress: () => router.push('/services'),
         },
         {
-            id: 'manage-staff',
-            title: 'Nhân viên',
-            description: 'Quản lý thông tin nhân viên',
-            icon: 'people',
-            color: '#22c55e',
-            bgColor: '#dcfce7',
-            onPress: () => Alert.alert('Nhân viên', 'Chức năng đang phát triển'),
-        },
-        {
             id: 'view-history',
             title: 'Lịch sử',
             description: 'Xem lịch sử hoạt động',
@@ -72,7 +63,7 @@ export default function SystemScreen() {
             icon: 'bar-chart',
             color: '#06b6d4',
             bgColor: '#cffafe',
-            onPress: () => Alert.alert('Thống kê', 'Chức năng đang phát triển'),
+            onPress: () => router.push('/statistics'),
         },
         {
             id: 'settings',
@@ -82,15 +73,6 @@ export default function SystemScreen() {
             color: '#64748b',
             bgColor: '#f1f5f9',
             onPress: () => Alert.alert('Cài đặt', 'Chức năng đang phát triển'),
-        },
-        {
-            id: 'backup',
-            title: 'Sao lưu',
-            description: 'Backup & khôi phục',
-            icon: 'cloud-upload',
-            color: '#10b981',
-            bgColor: '#d1fae5',
-            onPress: () => Alert.alert('Sao lưu', 'Chức năng đang phát triển'),
         },
     ];
 

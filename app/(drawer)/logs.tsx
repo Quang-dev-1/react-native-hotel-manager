@@ -3,6 +3,7 @@ import historyService, { HistoryRecord } from '@/services/historyService';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
@@ -137,10 +138,8 @@ export default function LogsScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.header}>
                 <View style={styles.headerTop}>
-                    <TouchableOpacity
-                        style={styles.menuButton}
-                        onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-                        <Ionicons name="menu" size={28} color="#fff" />
+                    <TouchableOpacity onPress={() => router.push('/system')}>
+                        <Ionicons name="arrow-back" size={24} color="#1e293b" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Lịch sử</Text>
                 </View>

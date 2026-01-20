@@ -314,7 +314,13 @@ export default function BookingsScreen() {
                 roomService.getRooms(),
                 bookingService.getActiveBookings(),
             ]);
-            setRooms(roomsData);
+            const sortedRooms = roomsData.sort((a, b) => {
+                return a.roomNumber.localeCompare(b.roomNumber, undefined, {
+                    numeric: true,
+                    sensitivity: 'base'
+                });
+            });
+            setRooms(sortedRooms);
             setBookings(bookingsData);
         } catch (error: any) {
             Alert.alert('Lỗi', error.message || 'Không thể tải dữ liệu');

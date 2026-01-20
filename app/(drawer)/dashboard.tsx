@@ -37,6 +37,7 @@ export default function DashboardScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
+    const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
 
     const loadDashboardStats = async () => {
         try {
@@ -46,7 +47,7 @@ export default function DashboardScreen() {
             const summary = await financeService.getFinanceSummary('month');
             setFinanceSummary(summary);
 
-            await loadRentalChart();
+            await loadRentalChart(currentWeekOffset);
         } catch (error: any) {
             console.error('❌ Load dashboard stats error:', error);
             Alert.alert(
@@ -60,53 +61,46 @@ export default function DashboardScreen() {
         }
     };
 
-    const loadRentalChart = async () => {
+    const loadRentalChart = async (weekOffset: number = 0) => {
         try {
             console.log('📈 Loading rental chart data...');
 
             const allBookings = await BookingService.getAllBookings();
 
             const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayStr = today.toISOString().split('T')[0];
+            const currentDay = today.getDay();
+            const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
 
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            const monday = new Date(today);
+            monday.setDate(today.getDate() + mondayOffset + (weekOffset * 7));
+            monday.setHours(0, 0, 0, 0);
 
-            const todayRentals = allBookings.filter(b => {
-                if (!b.createdAt) return false;
-                const createdDate = new Date(b.createdAt);
-                createdDate.setHours(0, 0, 0, 0);
-                return createdDate.toISOString().split('T')[0] === todayStr;
-            }).length;
+            const weekData: ChartData[] = [];
+            const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
-            const yesterdayRentals = allBookings.filter(b => {
-                if (!b.createdAt) return false;
-                const createdDate = new Date(b.createdAt);
-                createdDate.setHours(0, 0, 0, 0);
-                return createdDate.toISOString().split('T')[0] === yesterdayStr;
-            }).length;
+            for (let i = 0; i < 7; i++) {
+                const currentDate = new Date(monday);
+                currentDate.setDate(monday.getDate() + i);
+                const dateStr = currentDate.toISOString().split('T')[0];
 
-            const chartData: ChartData[] = [
-                {
-                    date: `${yesterday.getDate()}/${yesterday.getMonth() + 1}`,
-                    value: yesterdayRentals
-                },
-                {
-                    date: `${today.getDate()}/${today.getMonth() + 1}`,
-                    value: todayRentals
-                },
-            ];
+                const dayRentals = allBookings.filter(b => {
+                    if (!b.createdAt) return false;
+                    const createdDate = new Date(b.createdAt);
+                    createdDate.setHours(0, 0, 0, 0);
+                    return createdDate.toISOString().split('T')[0] === dateStr;
+                }).length;
 
-            setChartData(chartData);
-            console.log('✅ Chart data loaded:', chartData);
+                weekData.push({
+                    date: `${dayNames[i]} ${currentDate.getDate()}/${currentDate.getMonth() + 1}`,
+                    value: dayRentals
+                });
+            }
+
+            setChartData(weekData);
+            console.log('✅ Chart data loaded:', weekData);
         } catch (error) {
             console.error('❌ Load chart data error:', error);
-            setChartData([
-                { date: 'Hôm qua', value: 0 },
-                { date: 'Hôm nay', value: stats.todayRentals },
-            ]);
+            setChartData([]);
         }
     };
 
@@ -120,9 +114,27 @@ export default function DashboardScreen() {
         return () => clearInterval(interval);
     }, []);
 
+    useEffect(() => {
+        if (!loading) {
+            loadRentalChart(currentWeekOffset);
+        }
+    }, [currentWeekOffset]);
+
     const onRefresh = () => {
         setRefreshing(true);
         loadDashboardStats();
+    };
+
+    const goToPreviousWeek = () => {
+        setCurrentWeekOffset(prev => prev - 1);
+    };
+
+    const goToNextWeek = () => {
+        setCurrentWeekOffset(prev => prev + 1);
+    };
+
+    const goToCurrentWeek = () => {
+        setCurrentWeekOffset(0);
     };
 
     const statCards = [
@@ -257,6 +269,42 @@ export default function DashboardScreen() {
                         <Text style={styles.chartTitle}>Lượt thuê phòng</Text>
                     </View>
 
+                    <View style={styles.weekNavigation}>
+                        <TouchableOpacity
+                            style={styles.weekButton}
+                            onPress={goToPreviousWeek}
+                        >
+                            <Ionicons name="chevron-back" size={20} color="#4a90e2" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.currentWeekButton}
+                            onPress={goToCurrentWeek}
+                            disabled={currentWeekOffset === 0}
+                        >
+                            <Text style={[
+                                styles.weekButtonText,
+                                currentWeekOffset === 0 && styles.weekButtonTextActive
+                            ]}>
+                                {currentWeekOffset === 0 ? 'Tuần này' :
+                                    currentWeekOffset < 0 ? `${Math.abs(currentWeekOffset)} tuần trước` :
+                                        `${currentWeekOffset} tuần sau`}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.weekButton}
+                            onPress={goToNextWeek}
+                            disabled={currentWeekOffset >= 0}
+                        >
+                            <Ionicons
+                                name="chevron-forward"
+                                size={20}
+                                color={currentWeekOffset >= 0 ? '#cbd5e1' : '#4a90e2'}
+                            />
+                        </TouchableOpacity>
+                    </View>
+
                     <View style={styles.chart}>
                         {chartData.map((item, index) => (
                             <View key={index} style={styles.chartBar}>
@@ -265,7 +313,7 @@ export default function DashboardScreen() {
                                         style={[
                                             styles.bar,
                                             {
-                                                height: `${(item.value / maxValue) * 100}%`,
+                                                height: `${maxValue > 0 ? (item.value / maxValue) * 100 : 0}%`,
                                             },
                                         ]}>
                                         <LinearGradient
@@ -380,7 +428,40 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     rotating: {
-        // Animation có thể thêm sau
+
+    },
+    weekNavigation: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+        paddingHorizontal: 4,
+    },
+    weekButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#f1f5f9',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    currentWeekButton: {
+        flex: 1,
+        marginHorizontal: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: '#f1f5f9',
+        alignItems: 'center',
+    },
+    weekButtonText: {
+        fontSize: 13,
+        color: '#64748b',
+        fontWeight: '600',
+    },
+    weekButtonTextActive: {
+        color: '#4a90e2',
+        fontWeight: '700',
     },
     headerTitle: {
         fontSize: 20,
@@ -478,24 +559,25 @@ const styles = StyleSheet.create({
     },
     chart: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
+        justifyContent: 'space-between',
         alignItems: 'flex-end',
         height: 200,
         paddingVertical: 10,
+        paddingHorizontal: 8,
     },
     chartBar: {
         alignItems: 'center',
-        flex: 1,
+        width: 40,
     },
     barContainer: {
         height: 150,
-        width: 60,
+        width: '100%',
         justifyContent: 'flex-end',
         alignItems: 'center',
     },
     bar: {
-        width: 50,
-        borderRadius: 8,
+        width: '80%',
+        borderRadius: 6,
         overflow: 'hidden',
         minHeight: 4,
     },
@@ -504,14 +586,14 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     barValue: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '700',
         color: '#1e293b',
-        marginTop: 8,
+        marginTop: 6,
     },
     chartLabel: {
-        marginTop: 4,
-        fontSize: 12,
+        marginTop: 2,
+        fontSize: 10,
         color: '#64748b',
         fontWeight: '600',
     },

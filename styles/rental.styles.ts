@@ -611,4 +611,12 @@ export const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#4a90e2',
     },
+    historyButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: 'rgba(96, 52, 52, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 });

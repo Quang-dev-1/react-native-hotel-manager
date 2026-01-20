@@ -20,11 +20,14 @@ import DashboardScreen from '../(drawer)/dashboard';
 import ProfileScreen from '../(drawer)/profile';
 import RentalScreen from '../(drawer)/rental';
 import FinanceScreen from './finance';
+import InvoiceScreen from './invoice';
 import LogsScreen from './logs';
 import PaymentScreen from './PaymentScreen';
+import RecentHistoryScreen from './RecentHistoryScreen';
 import RoomTypesScreen from './room-types';
 import RoomsScreen from './rooms';
 import ServicesScreen from './services';
+import StatisticsScreen from './statistics';
 import SystemScreen from './system';
 import WarehouseScreen from './warehouse';
 
@@ -107,12 +110,7 @@ function CustomDrawerContent() {
       screen: 'system',
       component: SystemScreen,
     },
-    {
-      name: 'Nhật ký hệ thống',
-      icon: 'time-outline',
-      screen: 'logs',
-      component: LogsScreen,
-    },
+
     {
       name: 'Tài khoản',
       icon: 'person-outline',
@@ -198,6 +196,17 @@ export default function DrawerLayout() {
           <Drawer.Screen name="rooms" component={RoomsScreen} />
           <Drawer.Screen name="room-types" component={RoomTypesScreen} />
           <Drawer.Screen name="PaymentScreen" component={PaymentScreen} />
+          <Drawer.Screen name="inventory" component={InvoiceScreen} />
+          <Drawer.Screen name="statistics" component={StatisticsScreen} />
+          <Drawer.Screen name="RecentHistory" component={RecentHistoryScreen}
+            options={{
+              headerShown: false,
+              drawerLabel: 'Lịch sử gần đây',
+              drawerIcon: ({ color, size }) => (
+                <Ionicons name="time-outline" size={size} color={color} />
+              )
+            }}
+          />
         </Drawer.Navigator>
       </BookingProvider>
     </RoomProvider>

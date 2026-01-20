@@ -817,6 +817,11 @@ export default function RentalScreen() {
                             <Ionicons name="menu" size={28} color="#fff" />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>Phòng đang thuê</Text>
+                        <TouchableOpacity
+                            style={styles.historyButton}
+                            onPress={() => navigation.navigate('RecentHistory')}>
+                            <Ionicons name="time-outline" size={24} color="#fff" />
+                        </TouchableOpacity>
                     </View>
                 </LinearGradient>
                 <View style={styles.loadingContainer}>
@@ -841,6 +846,11 @@ export default function RentalScreen() {
                         <Ionicons name="menu" size={28} color="#fff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Phòng đang thuê</Text>
+                    <TouchableOpacity
+                        style={styles.historyButton}
+                        onPress={() => navigation.navigate('RecentHistory')}>
+                        <Ionicons name="time-outline" size={24} color="#fff" />
+                    </TouchableOpacity>
                 </View>
             </LinearGradient>
 

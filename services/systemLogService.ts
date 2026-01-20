@@ -2,7 +2,7 @@ import apiClient from './api';
 
 export interface SystemLog {
   id?: number;
-  type: string; // SUCCESS, INFO, WARNING, ERROR
+  type: string;
   action: string;
   user: string;
   description: string;
@@ -11,8 +11,7 @@ export interface SystemLog {
 }
 
 class SystemLogService {
-  // ============ SYSTEM LOG APIs ============
-  
+
   async getAllLogs(): Promise<SystemLog[]> {
     try {
       console.log('📋 Fetching all logs...');
