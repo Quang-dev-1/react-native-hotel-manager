@@ -196,7 +196,6 @@ export default function ProfileDetailScreen() {
                         </Text>
                     </View>
 
-                    {/* ID - Readonly (nếu có) */}
                     {user?.id && (
                         <View style={styles.inputWrap}>
                             <Text style={styles.label}>ID người dùng</Text>
@@ -207,7 +206,6 @@ export default function ProfileDetailScreen() {
                         </View>
                     )}
 
-                    {/* Full Name - Editable */}
                     <View style={styles.inputWrap}>
                         <Text style={styles.label}>
                             Họ và tên <Text style={styles.required}>*</Text>
@@ -236,7 +234,6 @@ export default function ProfileDetailScreen() {
                         </View>
                     </View>
 
-                    {/* Phone - Editable */}
                     <View style={styles.inputWrap}>
                         <Text style={styles.label}>
                             Số điện thoại <Text style={styles.required}>*</Text>
@@ -270,26 +267,9 @@ export default function ProfileDetailScreen() {
                         </Text>
                     </View>
 
-                    {/* Role - Readonly */}
-                    <View style={styles.inputWrap}>
-                        <Text style={styles.label}>Vai trò</Text>
-                        <View style={[styles.inputField, styles.disabled]}>
-                            <Ionicons name="shield-checkmark-outline" size={20} color="#94a3b8" />
-                            <Text style={styles.disabledText}>{user?.role || 'USER'}</Text>
-                        </View>
-                    </View>
+
                 </View>
 
-                {/* Info Box */}
-                <View style={styles.infoBox}>
-                    <Ionicons name="information-circle" size={20} color="#4a90e2" />
-                    <Text style={styles.infoBoxText}>
-                        Vui lòng nhập đầy đủ và chính xác thông tin. Thông tin này sẽ được
-                        hiển thị trong hệ thống và có thể được sử dụng để liên hệ.
-                    </Text>
-                </View>
-
-                {/* Action Buttons */}
                 <View style={styles.actionButtons}>
                     <TouchableOpacity
                         style={styles.cancelBtn}

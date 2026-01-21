@@ -80,7 +80,7 @@ export default function ProfileScreen() {
           onPress: () => router.replace('/(auth)/login'),
         },
       ],
-      { cancelable: false } // Không cho phép đóng alert bằng cách tap ra ngoài
+      { cancelable: false }
     );
   };
 
@@ -89,7 +89,7 @@ export default function ProfileScreen() {
       icon: 'person-outline',
       title: 'Thông tin cá nhân',
       subtitle: 'Cập nhật thông tin tài khoản',
-      onPress: () => router.push('/profile-detail'),
+      onPress: () => setShowEditModal(true), // Mở modal edit profile
       badge: null,
     },
     {
@@ -111,7 +111,7 @@ export default function ProfileScreen() {
       title: 'Thông báo',
       subtitle: 'Cài đặt thông báo',
       onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển'),
-      badge: '3',
+      badge: null,
     },
     {
       icon: 'help-circle-outline',
@@ -186,10 +186,14 @@ export default function ProfileScreen() {
               {user.fullName || 'Chưa cập nhật'}
             </Text>
 
-            <View style={styles.roleBadge}>
-              <Ionicons name="shield-checkmark" size={12} color="#4a90e2" />
-              <Text style={styles.userRole}>{user.role || 'USER'}</Text>
-            </View>
+            <Text style={styles.userEmail}>{user.email}</Text>
+
+            {user.phone && (
+              <View style={styles.phoneContainer}>
+                <Ionicons name="call-outline" size={14} color="#64748b" />
+                <Text style={styles.userPhone}>{user.phone}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -351,14 +355,31 @@ const styles = StyleSheet.create({
 
   userInfo: {
     alignItems: 'center',
-    marginBottom: 16,
+    gap: 8,
   },
 
   userName: {
     fontSize: 24,
     fontWeight: '700',
     color: '#1e293b',
-    marginBottom: 8,
+  },
+
+  userEmail: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+
+  phoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+
+  userPhone: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
   },
 
   roleBadge: {
@@ -369,6 +390,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
+    marginTop: 4,
   },
 
   userRole: {
@@ -384,6 +406,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textTransform: 'uppercase',
     paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 12,
   },
 

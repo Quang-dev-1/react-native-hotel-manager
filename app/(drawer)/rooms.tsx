@@ -36,7 +36,7 @@ export default function RoomsScreen() {
     };
 
     const handleDelete = (id: number) => {
-        Alert.alert('Xác nhận', 'Xóa phòng này?', [
+        Alert.alert('Xác nhận', 'Bạn có chắc muốn xóa phòng này?', [
             { text: 'Hủy', style: 'cancel' },
             {
                 text: 'Xóa',
@@ -44,7 +44,7 @@ export default function RoomsScreen() {
                 onPress: async () => {
                     try {
                         await roomService.deleteRoom(id);
-                        Alert.alert('Thành công', 'Đã xóa phòng');
+                        Alert.alert('Thành công', 'Đã xóa phòng thành công');
                         fetchRooms();
                     } catch (e: any) {
                         Alert.alert('Lỗi', e.message || 'Không thể xóa phòng');
@@ -55,31 +55,32 @@ export default function RoomsScreen() {
     };
 
     const getStatusColor = (status: string) => {
-        switch (status?.toLowerCase()) {
-            case 'available':
-            case 'trống':
+        switch (status?.toUpperCase()) {
+            case 'AVAILABLE':
                 return '#10b981';
-            case 'occupied':
-            case 'đang sử dụng':
+            case 'OCCUPIED':
                 return '#ef4444';
-            case 'maintenance':
-            case 'bảo trì':
+            case 'MAINTENANCE':
                 return '#f59e0b';
+            case 'CLEANING':
+                return '#3b82f6';
             default:
                 return '#64748b';
         }
     };
 
     const getStatusText = (status: string) => {
-        switch (status?.toLowerCase()) {
-            case 'available':
+        switch (status?.toUpperCase()) {
+            case 'AVAILABLE':
                 return 'Trống';
-            case 'occupied':
+            case 'OCCUPIED':
                 return 'Đang sử dụng';
-            case 'maintenance':
+            case 'MAINTENANCE':
                 return 'Bảo trì';
+            case 'CLEANING':
+                return 'Đang dọn';
             default:
-                return status;
+                return 'Không xác định';
         }
     };
 
@@ -103,11 +104,15 @@ export default function RoomsScreen() {
                     </View>
                     <View style={styles.detailItem}>
                         <Ionicons name="cash" size={14} color="#64748b" />
-                        <Text style={styles.detailText}>{Number(item.price).toLocaleString()} VND</Text>
+                        <Text style={styles.detailText}>
+                            {Number(item.price).toLocaleString('vi-VN')}₫
+                        </Text>
                     </View>
                 </View>
                 {item.description && (
-                    <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
+                    <Text style={styles.description} numberOfLines={2}>
+                        {item.description}
+                    </Text>
                 )}
             </View>
             <TouchableOpacity onPress={() => handleDelete(item.id!)} style={styles.deleteButton}>
@@ -129,15 +134,33 @@ export default function RoomsScreen() {
             </View>
 
             {loading ? (
-                <ActivityIndicator style={{ marginTop: 50 }} color="#3b82f6" />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#3b82f6" />
+                    <Text style={styles.loadingText}>Đang tải danh sách phòng...</Text>
+                </View>
             ) : (
                 <FlatList
                     data={rooms}
                     keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
                     renderItem={renderItem}
                     contentContainerStyle={{ padding: 16 }}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-                    ListEmptyComponent={<Text style={styles.emptyText}>Chưa có phòng nào</Text>}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={['#3b82f6']}
+                            tintColor="#3b82f6"
+                        />
+                    }
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Ionicons name="bed-outline" size={64} color="#cbd5e1" />
+                            <Text style={styles.emptyText}>Chưa có phòng nào</Text>
+                            <Text style={styles.emptySubtext}>
+                                Nhấn nút + ở góc trên để thêm phòng mới
+                            </Text>
+                        </View>
+                    }
                 />
             )}
 
@@ -175,6 +198,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#3b82f6',
         padding: 8,
         borderRadius: 8
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 12
+    },
+    loadingText: {
+        fontSize: 16,
+        color: '#64748b',
+        fontWeight: '500'
     },
     roomItem: {
         flexDirection: 'row',
@@ -252,10 +286,23 @@ const styles = StyleSheet.create({
         padding: 8,
         justifyContent: 'center'
     },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingTop: 100,
+        gap: 12
+    },
     emptyText: {
         textAlign: 'center',
-        marginTop: 50,
+        color: '#64748b',
+        fontSize: 18,
+        fontWeight: '600'
+    },
+    emptySubtext: {
+        textAlign: 'center',
         color: '#94a3b8',
-        fontSize: 15
+        fontSize: 14,
+        marginTop: 4
     }
 });

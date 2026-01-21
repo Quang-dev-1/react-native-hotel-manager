@@ -3,7 +3,7 @@ import { DrawerActions } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AddRoomModal from '../../components/AddRoomModal';
 import AddRoomTypeModal from '../../components/AddRoomTypeModal';
 import AddServiceModal from '../../components/AddServiceModal';
@@ -72,7 +72,7 @@ export default function SystemScreen() {
             icon: 'settings',
             color: '#64748b',
             bgColor: '#f1f5f9',
-            onPress: () => Alert.alert('Cài đặt', 'Chức năng đang phát triển'),
+            onPress: () => router.push('/settings'),
         },
     ];
 

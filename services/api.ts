@@ -2,21 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
 
-// Địa chỉ Railway backend của bạn
 const RAILWAY_DOMAIN = 'hotel-manager-backend-production.up.railway.app';
 
-// Chỉ dùng localhost khi development trên máy tính
 const COMPUTER_IP = '192.168.1.14';
 
 const getBaseURL = () => {
-  // Sử dụng Railway domain cho production (iOS và Android thật)
-  const useProduction = true; // Đổi thành false nếu muốn test local
-  
+  const useProduction = true;
+
   if (useProduction) {
     return `https://${RAILWAY_DOMAIN}/api`;
   }
-  
-  // Development mode - chỉ dùng khi test local
+
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:8080/api';
   } else if (Platform.OS === 'ios') {
@@ -33,7 +29,7 @@ console.log('📱 Platform:', Platform.OS);
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -75,7 +71,7 @@ apiClient.interceptors.response.use(
         message: error.message,
       });
     }
-    
+
     if (error.response?.status === 401) {
       await AsyncStorage.removeItem('authToken');
       await AsyncStorage.removeItem('userEmail');

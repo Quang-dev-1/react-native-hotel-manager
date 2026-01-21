@@ -16,12 +16,15 @@ import {
     View,
 } from 'react-native';
 
+const ITEMS_PER_PAGE = 5;
+
 export default function LogsScreen() {
     const navigation = useNavigation<any>();
     const [history, setHistory] = useState<HistoryRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [historyWithServices, setHistoryWithServices] = useState<{ [key: number]: any }>({});
+    const [currentPage, setCurrentPage] = useState(1);
 
     const fetchHistoryWithServices = async (historyId: number, bookingId: number) => {
         try {
@@ -34,6 +37,7 @@ export default function LogsScreen() {
             console.error('Error fetching history services:', error);
         }
     };
+
     const fetchHistory = async () => {
         try {
             setLoading(true);
@@ -53,6 +57,7 @@ export default function LogsScreen() {
             setLoading(false);
         }
     };
+
     const loadServicesInBackground = async (historyData: HistoryRecord[]) => {
         for (const record of historyData) {
             if (record.id && record.bookingId) {
@@ -60,9 +65,11 @@ export default function LogsScreen() {
             }
         }
     };
+
     useFocusEffect(
         useCallback(() => {
             fetchHistory();
+            setCurrentPage(1);
         }, [])
     );
 
@@ -71,6 +78,16 @@ export default function LogsScreen() {
         record.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         record.phone.includes(searchQuery)
     );
+
+    // Phân trang
+    const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const currentPageData = filteredHistory.slice(startIndex, endIndex);
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+    };
 
     const handleDelete = async (id: number) => {
         Alert.alert(
@@ -139,7 +156,7 @@ export default function LogsScreen() {
                 style={styles.header}>
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.push('/system')}>
-                        <Ionicons name="arrow-back" size={24} color="#1e293b" />
+                        <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Lịch sử</Text>
                 </View>
@@ -152,11 +169,17 @@ export default function LogsScreen() {
                         style={styles.searchInput}
                         placeholder="Tìm theo phòng, khách hàng, SĐT..."
                         value={searchQuery}
-                        onChangeText={setSearchQuery}
+                        onChangeText={(text) => {
+                            setSearchQuery(text);
+                            setCurrentPage(1);
+                        }}
                         placeholderTextColor="#94a3b8"
                     />
                     {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                        <TouchableOpacity onPress={() => {
+                            setSearchQuery('');
+                            setCurrentPage(1);
+                        }}>
                             <Ionicons name="close-circle" size={20} color="#94a3b8" />
                         </TouchableOpacity>
                     )}
@@ -180,7 +203,7 @@ export default function LogsScreen() {
                         <Text style={styles.statNumber}>
                             {history.reduce((sum, h) => sum + h.totalAmount, 0).toLocaleString('vi-VN')}đ
                         </Text>
-                        <Text style={styles.statLabel}>Tổng doanh thu</Text>
+                        <Text style={styles.statLabel}>Tổng thu thực tế</Text>
                     </View>
                 </View>
 
@@ -188,9 +211,14 @@ export default function LogsScreen() {
                     <Text style={styles.headerText}>
                         {filteredHistory.length} bản ghi
                     </Text>
+                    {totalPages > 1 && (
+                        <Text style={styles.pageInfo}>
+                            Trang {currentPage}/{totalPages}
+                        </Text>
+                    )}
                 </View>
 
-                {filteredHistory.map(record => (
+                {currentPageData.map(record => (
                     <View key={record.id} style={styles.historyCard}>
                         <View style={styles.cardHeader}>
                             <View style={styles.cardHeaderLeft}>
@@ -314,6 +342,59 @@ export default function LogsScreen() {
                         </Text>
                     </View>
                 )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <View style={styles.paginationContainer}>
+                        <TouchableOpacity
+                            style={[
+                                styles.paginationButton,
+                                currentPage === 1 && styles.paginationButtonDisabled
+                            ]}
+                            onPress={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}>
+                            <Ionicons
+                                name="chevron-back"
+                                size={20}
+                                color={currentPage === 1 ? '#cbd5e1' : '#4a90e2'}
+                            />
+                        </TouchableOpacity>
+
+                        <View style={styles.paginationNumbers}>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                <TouchableOpacity
+                                    key={page}
+                                    style={[
+                                        styles.paginationNumber,
+                                        currentPage === page && styles.paginationNumberActive
+                                    ]}
+                                    onPress={() => handlePageChange(page)}>
+                                    <Text
+                                        style={[
+                                            styles.paginationNumberText,
+                                            currentPage === page && styles.paginationNumberTextActive
+                                        ]}>
+                                        {page}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.paginationButton,
+                                currentPage === totalPages && styles.paginationButtonDisabled
+                            ]}
+                            onPress={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}>
+                            <Ionicons
+                                name="chevron-forward"
+                                size={20}
+                                color={currentPage === totalPages ? '#cbd5e1' : '#4a90e2'}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                )}
             </ScrollView>
         </View>
     );
@@ -419,12 +500,20 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 16,
     },
     headerText: {
         fontSize: 16,
         fontWeight: '700',
         color: '#1e293b',
+    },
+    pageInfo: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#64748b',
     },
     historyCard: {
         backgroundColor: '#fff',
@@ -573,7 +662,8 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#64748b',
         textAlign: 'center',
-    }, servicesSection: {
+    },
+    servicesSection: {
         padding: 12,
         backgroundColor: '#f8fafc',
         borderTopWidth: 1,
@@ -607,5 +697,57 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#1e293b',
         fontWeight: '600',
+    },
+    paginationContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 20,
+        marginBottom: 10,
+        gap: 12,
+    },
+    paginationButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    paginationButtonDisabled: {
+        backgroundColor: '#f8fafc',
+    },
+    paginationNumbers: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    paginationNumber: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    paginationNumberActive: {
+        backgroundColor: '#4a90e2',
+    },
+    paginationNumberText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#64748b',
+    },
+    paginationNumberTextActive: {
+        color: '#fff',
     },
 });

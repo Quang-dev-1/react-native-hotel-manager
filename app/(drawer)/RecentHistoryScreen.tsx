@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
+import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -467,14 +468,13 @@ export default function RecentHistoryScreen() {
         try {
             setLoading(true);
             const data = await historyService.getAllHistory();
-            // Sắp xếp theo thời gian mới nhất
             const sortedData = data.sort((a, b) => {
                 const dateA = new Date(a.createdAt || a.actualCheckOut);
                 const dateB = new Date(b.createdAt || b.actualCheckOut);
                 return dateB.getTime() - dateA.getTime();
             });
             setHistory(sortedData);
-            setCurrentPage(1); // Reset về trang 1 khi load lại data
+            setCurrentPage(1);
         } catch (error: any) {
             Alert.alert('Lỗi', error.message || 'Không thể tải lịch sử');
         } finally {
@@ -482,7 +482,6 @@ export default function RecentHistoryScreen() {
         }
     };
 
-    // Tính toán dữ liệu cho trang hiện tại
     const totalPages = Math.ceil(history.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -596,8 +595,8 @@ export default function RecentHistoryScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.header}>
                 <View style={styles.headerTop}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color="#fff" />
+                    <TouchableOpacity onPress={() => router.push('/rental')}>
+                        <Ionicons name="arrow-back" size={24} color="#1e293b" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Lịch sử gần đây</Text>
                     <View style={{ width: 24 }} />

@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Image,
     KeyboardAvoidingView,
@@ -15,67 +16,76 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import authService from '../../services/authService';
 
 export default function ForgotPasswordScreen() {
-    const [step, setStep] = useState<'phone' | 'code' | 'newPassword'>('phone');
-    const [phone, setPhone] = useState('');
-    const [verificationCode, setVerificationCode] = useState('');
+    const [step, setStep] = useState<'email' | 'otp' | 'password'>('email');
+    const [email, setEmail] = useState('');
+    const [otp, setOtp] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const [phoneError, setPhoneError] = useState('');
-    const [codeError, setCodeError] = useState('');
+    const [emailError, setEmailError] = useState('');
+    const [otpError, setOtpError] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
-    const mockUsers = ['0367287044', '0912345678', '0987654321'];
-    const mockVerificationCode = '123456';
-
-    const handleSendCode = () => {
-        if (!phone.trim()) {
-            setPhoneError('Vui lòng nhập số điện thoại');
+    const handleSendOTP = async () => {
+        // Validate email
+        if (!email.trim()) {
+            setEmailError('Vui lòng nhập email');
             return;
         }
 
-        const phoneRegex = /^[0-9]{10}$/;
-        if (!phoneRegex.test(phone)) {
-            setPhoneError('Vui lòng nhập số điện thoại hợp lệ gồm 10 chữ số');
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setEmailError('Vui lòng nhập email hợp lệ');
             return;
         }
 
-        if (!mockUsers.includes(phone)) {
-            setPhoneError('Số điện thoại này chưa được đăng ký trong hệ thống');
-            return;
-        }
+        setEmailError('');
+        setLoading(true);
 
-        setPhoneError('');
-        Alert.alert(
-            'Đã Gửi Mã Xác Thực',
-            `Mã xác thực đã được gửi đến ${phone}\n\nĐể kiểm tra, sử dụng mã: 123456`,
-            [{ text: 'OK', onPress: () => setStep('code') }]
-        );
+        try {
+            await authService.forgotPassword({ email: email.trim() });
+
+            Alert.alert(
+                'Thành Công!',
+                'Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư (kể cả thư mục Spam).',
+                [{ text: 'OK', onPress: () => setStep('otp') }]
+            );
+        } catch (error: any) {
+            Alert.alert('Lỗi', error.message || 'Không thể gửi mã OTP');
+            setEmailError(error.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleVerifyCode = () => {
-        if (!verificationCode.trim()) {
-            setCodeError('Vui lòng nhập mã xác thực');
+    const handleVerifyOTP = () => {
+        // Validate OTP
+        if (!otp.trim()) {
+            setOtpError('Vui lòng nhập mã OTP');
             return;
         }
 
-        if (verificationCode !== mockVerificationCode) {
-            setCodeError('Mã xác thực không hợp lệ. Vui lòng thử lại');
+        if (otp.length !== 6) {
+            setOtpError('Mã OTP phải có 6 chữ số');
             return;
         }
 
-        setCodeError('');
-        setStep('newPassword');
+        setOtpError('');
+        // Chuyển sang bước nhập mật khẩu
+        setStep('password');
     };
 
-    const handleResetPassword = () => {
+    const handleResetPassword = async () => {
         let hasError = false;
 
+        // Validate new password
         if (!newPassword.trim()) {
             setPasswordError('Vui lòng nhập mật khẩu mới');
             hasError = true;
@@ -86,6 +96,7 @@ export default function ForgotPasswordScreen() {
             setPasswordError('');
         }
 
+        // Validate confirm password
         if (newPassword !== confirmPassword) {
             setConfirmPasswordError('Mật khẩu không khớp');
             hasError = true;
@@ -95,39 +106,84 @@ export default function ForgotPasswordScreen() {
 
         if (hasError) return;
 
-        Alert.alert(
-            'Thành Công!',
-            'Mật khẩu của bạn đã được đặt lại thành công.',
-            [{ text: 'Đến Đăng Nhập', onPress: () => router.replace('/(auth)/login') }]
-        );
+        setLoading(true);
+
+        try {
+            await authService.resetPassword({
+                token: otp.trim(),
+                newPassword: newPassword.trim(),
+            });
+
+            Alert.alert(
+                'Thành Công!',
+                'Mật khẩu của bạn đã được đặt lại thành công.',
+                [{ text: 'Đến Đăng Nhập', onPress: () => router.replace('/(auth)/login') }]
+            );
+        } catch (error: any) {
+            if (error.message.includes('không hợp lệ') || error.message.includes('hết hạn')) {
+                Alert.alert(
+                    'Lỗi',
+                    'Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu mã mới.',
+                    [{
+                        text: 'Gửi Lại OTP', onPress: () => {
+                            setStep('email');
+                            setOtp('');
+                            setNewPassword('');
+                            setConfirmPassword('');
+                            setOtpError('');
+                            setPasswordError('');
+                            setConfirmPasswordError('');
+                        }
+                    }]
+                );
+            } else {
+                Alert.alert('Lỗi', error.message || 'Không thể đặt lại mật khẩu');
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleResendCode = () => {
-        Alert.alert('Đã Gửi Lại Mã', `Mã xác thực mới đã được gửi đến ${phone}\n\nĐể kiểm tra, sử dụng mã: 123456`);
+    const handleResendOTP = async () => {
+        setLoading(true);
+
+        try {
+            await authService.forgotPassword({ email: email.trim() });
+            Alert.alert('Thành Công', 'Mã OTP mới đã được gửi đến email của bạn');
+            setOtp('');
+            setOtpError('');
+        } catch (error: any) {
+            Alert.alert('Lỗi', error.message || 'Không thể gửi lại mã OTP');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleBack = () => {
-        if (step === 'phone') {
+        if (step === 'email') {
             router.back();
-        } else if (step === 'code') {
-            setStep('phone');
-            setCodeError('');
+        } else if (step === 'otp') {
+            setStep('email');
+            setOtp('');
+            setOtpError('');
         } else {
-            setStep('code');
+            setStep('otp');
+            setNewPassword('');
+            setConfirmPassword('');
             setPasswordError('');
             setConfirmPasswordError('');
         }
     };
 
     const getTitle = () => {
-        if (step === 'phone') return 'Quên Mật Khẩu?';
-        if (step === 'code') return 'Mã Xác Thực';
+        if (step === 'email') return 'Quên Mật Khẩu?';
+        if (step === 'otp') return 'Xác Thực OTP';
         return 'Mật Khẩu Mới';
     };
 
     const getSubtitle = () => {
-        if (step === 'phone') return 'Nhập số điện thoại để nhận mã xác thực';
-        if (step === 'code') return 'Nhập mã được gửi đến điện thoại của bạn';
+        if (step === 'email') return 'Nhập email để nhận mã OTP xác thực';
+        if (step === 'otp') return 'Nhập mã OTP được gửi đến email của bạn';
         return 'Tạo mật khẩu mới cho tài khoản của bạn';
     };
 
@@ -143,7 +199,7 @@ export default function ForgotPasswordScreen() {
                     keyboardShouldPersistTaps="handled">
 
                     {/* Nút Quay Lại */}
-                    <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+                    <TouchableOpacity style={styles.backBtn} onPress={handleBack} disabled={loading}>
                         <Ionicons name="arrow-back" size={24} color="#1f2035ff" />
                     </TouchableOpacity>
 
@@ -159,88 +215,111 @@ export default function ForgotPasswordScreen() {
 
                     {/* Form */}
                     <View style={styles.form}>
-                        {/* Bước 1: Số Điện Thoại */}
-                        {step === 'phone' && (
+                        {/* Bước 1: Email */}
+                        {step === 'email' && (
                             <>
                                 <View>
-                                    <View style={[styles.input, phoneError && styles.inputError]}>
-                                        <Ionicons name="call" size={20} color="#1f2035ff" />
+                                    <View style={[styles.input, emailError && styles.inputError]}>
+                                        <Ionicons name="mail" size={20} color="#1f2035ff" />
                                         <TextInput
                                             style={styles.textInput}
-                                            placeholder="Số Điện Thoại"
-                                            value={phone}
+                                            placeholder="Email"
+                                            value={email}
                                             onChangeText={(text) => {
-                                                setPhone(text);
-                                                setPhoneError('');
+                                                setEmail(text);
+                                                setEmailError('');
                                             }}
-                                            keyboardType="phone-pad"
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
                                             autoFocus
+                                            editable={!loading}
                                             placeholderTextColor="#9ca3af"
                                         />
                                     </View>
-                                    {phoneError ? (
+                                    {emailError ? (
                                         <View style={styles.errorContainer}>
                                             <Ionicons name="alert-circle" size={14} color="#ef4444" />
-                                            <Text style={styles.errorText}>{phoneError}</Text>
+                                            <Text style={styles.errorText}>{emailError}</Text>
                                         </View>
                                     ) : null}
                                 </View>
 
-                                <TouchableOpacity onPress={handleSendCode} style={styles.btnWrap}>
+                                <TouchableOpacity
+                                    onPress={handleSendOTP}
+                                    style={styles.btnWrap}
+                                    disabled={loading}>
                                     <LinearGradient colors={['#1f2035ff', '#151165ff']} style={styles.btn}>
-                                        <Text style={styles.btnTxt}>Gửi Mã</Text>
-                                        <Ionicons name="send" size={20} color="#fff" />
+                                        {loading ? (
+                                            <ActivityIndicator color="#fff" />
+                                        ) : (
+                                            <>
+                                                <Text style={styles.btnTxt}>Gửi Mã OTP</Text>
+                                                <Ionicons name="send" size={20} color="#fff" />
+                                            </>
+                                        )}
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </>
                         )}
 
-                        {/* Bước 2: Mã Xác Thực */}
-                        {step === 'code' && (
+                        {/* Bước 2: Nhập OTP */}
+                        {step === 'otp' && (
                             <>
                                 <View>
-                                    <View style={[styles.input, codeError && styles.inputError]}>
+                                    <View style={[styles.input, otpError && styles.inputError]}>
                                         <Ionicons name="key" size={20} color="#1f2035ff" />
                                         <TextInput
                                             style={[styles.textInput, styles.codeInput]}
                                             placeholder="------"
-                                            value={verificationCode}
+                                            value={otp}
                                             onChangeText={(text) => {
-                                                setVerificationCode(text);
-                                                setCodeError('');
+                                                setOtp(text);
+                                                setOtpError('');
                                             }}
                                             keyboardType="number-pad"
                                             maxLength={6}
                                             autoFocus
+                                            editable={!loading}
                                             placeholderTextColor="#9ca3af"
                                         />
                                     </View>
-                                    {codeError ? (
+                                    {otpError ? (
                                         <View style={styles.errorContainer}>
                                             <Ionicons name="alert-circle" size={14} color="#ef4444" />
-                                            <Text style={styles.errorText}>{codeError}</Text>
+                                            <Text style={styles.errorText}>{otpError}</Text>
                                         </View>
                                     ) : null}
                                 </View>
 
                                 <View style={styles.resend}>
                                     <Text style={styles.resendTxt}>Chưa nhận được mã? </Text>
-                                    <TouchableOpacity onPress={handleResendCode}>
-                                        <Text style={styles.resendLink}>Gửi Lại</Text>
+                                    <TouchableOpacity onPress={handleResendOTP} disabled={loading}>
+                                        <Text style={[styles.resendLink, loading && styles.disabled]}>
+                                            {loading ? 'Đang gửi...' : 'Gửi Lại'}
+                                        </Text>
                                     </TouchableOpacity>
                                 </View>
 
-                                <TouchableOpacity onPress={handleVerifyCode} style={styles.btnWrap}>
+                                <TouchableOpacity
+                                    onPress={handleVerifyOTP}
+                                    style={styles.btnWrap}
+                                    disabled={loading}>
                                     <LinearGradient colors={['#1f2035ff', '#151165ff']} style={styles.btn}>
-                                        <Text style={styles.btnTxt}>Xác Thực Mã</Text>
-                                        <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                                        {loading ? (
+                                            <ActivityIndicator color="#fff" />
+                                        ) : (
+                                            <>
+                                                <Text style={styles.btnTxt}>Xác Thực</Text>
+                                                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                                            </>
+                                        )}
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </>
                         )}
 
                         {/* Bước 3: Mật Khẩu Mới */}
-                        {step === 'newPassword' && (
+                        {step === 'password' && (
                             <>
                                 <View>
                                     <View style={[styles.input, passwordError && styles.inputError]}>
@@ -261,6 +340,7 @@ export default function ForgotPasswordScreen() {
                                             secureTextEntry={!showPassword}
                                             autoCapitalize="none"
                                             autoFocus
+                                            editable={!loading}
                                             placeholderTextColor="#9ca3af"
                                         />
                                         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -292,6 +372,7 @@ export default function ForgotPasswordScreen() {
                                             }}
                                             secureTextEntry={!showConfirmPassword}
                                             autoCapitalize="none"
+                                            editable={!loading}
                                             placeholderTextColor="#9ca3af"
                                         />
                                         <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
@@ -326,10 +407,19 @@ export default function ForgotPasswordScreen() {
                                     </View>
                                 </View>
 
-                                <TouchableOpacity onPress={handleResetPassword} style={styles.btnWrap}>
+                                <TouchableOpacity
+                                    onPress={handleResetPassword}
+                                    style={styles.btnWrap}
+                                    disabled={loading}>
                                     <LinearGradient colors={['#1f2035ff', '#151165ff']} style={styles.btn}>
-                                        <Text style={styles.btnTxt}>Đặt Lại Mật Khẩu</Text>
-                                        <Ionicons name="shield-checkmark" size={20} color="#fff" />
+                                        {loading ? (
+                                            <ActivityIndicator color="#fff" />
+                                        ) : (
+                                            <>
+                                                <Text style={styles.btnTxt}>Đặt Lại Mật Khẩu</Text>
+                                                <Ionicons name="shield-checkmark" size={20} color="#fff" />
+                                            </>
+                                        )}
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </>
@@ -443,6 +533,9 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#1f2035ff',
         fontWeight: '800',
+    },
+    disabled: {
+        opacity: 0.5,
     },
     requirements: {
         backgroundColor: '#f9fafb',

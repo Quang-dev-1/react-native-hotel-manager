@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from './api';
+import userService from './userService';
 
 export interface LoginRequest {
   email: string;
@@ -39,6 +40,15 @@ export interface User {
   role?: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
 class AuthService {
   async register(data: RegisterRequest): Promise<User> {
     try {
@@ -68,14 +78,11 @@ class AuthService {
         await AsyncStorage.setItem('authToken', response.data.token);
         console.log('💾 Token saved');
 
-        // Xử lý user data từ response
         let userData: User;
 
         if (response.data.user) {
-          // Format 1: Backend trả về { token, user: {...} }
           userData = response.data.user;
         } else {
-          // Format 2: Backend trả về { token, email, role }
           userData = {
             email: response.data.email || data.email,
             role: response.data.role || 'USER',
@@ -111,27 +118,32 @@ class AuthService {
   async updateProfile(userId: number, data: { fullName: string; phone: string }): Promise<User> {
     try {
       console.log('🔄 Updating profile for user:', userId, data);
-      const response = await apiClient.put<User>(`/users/${userId}`, data);
-      console.log('✅ Update profile response:', response.data);
 
+      // Sử dụng userService để update profile
+      const updatedUser = await userService.updateProfile(userId, data);
+      console.log('✅ Update profile response:', updatedUser);
+
+      // Lấy thông tin user hiện tại từ storage
       const currentUser = await this.getCurrentUser();
 
-      const updatedUser: User = {
-        id: currentUser?.id || userId,
-        email: currentUser?.email || response.data.email || '',
-        role: currentUser?.role || response.data.role || 'USER',
-        fullName: data.fullName,
-        phone: data.phone,
+      // Merge với data mới
+      const userData: User = {
+        id: updatedUser.id || currentUser?.id || userId,
+        email: updatedUser.email || currentUser?.email || '',
+        role: updatedUser.role || currentUser?.role || 'USER',
+        fullName: updatedUser.fullName || data.fullName,
+        phone: updatedUser.phone || data.phone,
       };
 
-      console.log('💾 Saving updated user data:', updatedUser);
-      await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+      // Lưu vào AsyncStorage
+      console.log('💾 Saving updated user data:', userData);
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
       console.log('✅ User data updated successfully');
 
-      return updatedUser;
+      return userData;
     } catch (error: any) {
-      console.error('❌ Update profile error:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || 'Không thể cập nhật thông tin');
+      console.error('❌ Update profile error:', error);
+      throw error; // Re-throw error từ userService
     }
   }
 
@@ -144,7 +156,6 @@ class AuthService {
         throw new Error('Không tìm thấy thông tin người dùng');
       }
 
-      // Gọi API đổi mật khẩu - Endpoint: POST /api/auth/change-password
       const response = await apiClient.post('/auth/change-password', {
         email: currentUser.email,
         oldPassword: data.oldPassword,
@@ -168,6 +179,51 @@ class AuthService {
         throw new Error(error.response.data.error);
       }
       throw new Error('Không thể đổi mật khẩu. Vui lòng thử lại');
+    }
+  }
+
+  async forgotPassword(data: ForgotPasswordRequest): Promise<void> {
+    try {
+      console.log('📧 Forgot password request:', data.email);
+      const response = await apiClient.post('/auth/forgot-password', data);
+      console.log('✅ OTP sent successfully:', response.data);
+    } catch (error: any) {
+      console.error('❌ Forgot password error:', error.response?.data || error.message);
+
+      if (error.response?.status === 404) {
+        throw new Error('Email không tồn tại trong hệ thống');
+      }
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      throw new Error('Không thể gửi mã OTP. Vui lòng thử lại');
+    }
+  }
+
+  async resetPassword(data: ResetPasswordRequest): Promise<void> {
+    try {
+      console.log('🔐 Reset password request:', { token: data.token });
+      const response = await apiClient.post('/auth/reset-password', {
+        token: data.token,
+        newPassword: data.newPassword
+      });
+      console.log('✅ Password reset successfully:', response.data);
+    } catch (error: any) {
+      console.error('❌ Reset password error:', error.response?.data || error.message);
+
+      if (error.response?.status === 400) {
+        throw new Error('Mã xác thực không hợp lệ hoặc đã hết hạn');
+      }
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      throw new Error('Không thể đặt lại mật khẩu. Vui lòng thử lại');
     }
   }
 

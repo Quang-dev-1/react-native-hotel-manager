@@ -157,13 +157,7 @@ export default function EditProfileModal({ visible, user, onClose, onSuccess }: 
                                 <Text style={styles.helperText}>Email không thể thay đổi</Text>
                             </View>
 
-                            <View style={styles.infoBox}>
-                                <Ionicons name="information-circle" size={20} color="#4a90e2" />
-                                <Text style={styles.infoText}>
-                                    Thông tin này sẽ được hiển thị trong hệ thống và có thể được
-                                    sử dụng để liên hệ.
-                                </Text>
-                            </View>
+
                         </View>
                     </ScrollView>
 

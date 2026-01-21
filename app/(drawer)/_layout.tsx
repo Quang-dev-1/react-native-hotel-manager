@@ -27,6 +27,7 @@ import RecentHistoryScreen from './RecentHistoryScreen';
 import RoomTypesScreen from './room-types';
 import RoomsScreen from './rooms';
 import ServicesScreen from './services';
+import SettingsScreen from './settings';
 import StatisticsScreen from './statistics';
 import SystemScreen from './system';
 import WarehouseScreen from './warehouse';
@@ -198,6 +199,7 @@ export default function DrawerLayout() {
           <Drawer.Screen name="PaymentScreen" component={PaymentScreen} />
           <Drawer.Screen name="inventory" component={InvoiceScreen} />
           <Drawer.Screen name="statistics" component={StatisticsScreen} />
+          <Drawer.Screen name="settings" component={SettingsScreen} />
           <Drawer.Screen name="RecentHistory" component={RecentHistoryScreen}
             options={{
               headerShown: false,
