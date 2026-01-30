@@ -16,6 +16,12 @@ export interface HistoryRecord {
     deposit: number;
     notes?: string;
     createdAt?: string;
+    paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL';
+    paymentMethod?: 'CASH' | 'ONLINE' | 'MIXED';
+
+    promotionCode?: string;
+    promotionName?: string;
+    discountAmount?: number;
 }
 
 export interface CreateHistoryRequest {
@@ -32,6 +38,12 @@ export interface CreateHistoryRequest {
     totalAmount: number;
     deposit: number;
     notes?: string;
+    paymentStatus?: 'PAID' | 'UNPAID' | 'PARTIAL';
+    paymentMethod?: 'CASH' | 'ONLINE' | 'MIXED';
+
+    promotionCode?: string;
+    promotionName?: string;
+    discountAmount?: number;
 }
 
 class HistoryService {
@@ -96,6 +108,25 @@ class HistoryService {
         } catch (error: any) {
             console.error('❌ Delete history error:', error);
             throw new Error(error.response?.data?.message || 'Không thể xóa lịch sử');
+        }
+    }
+
+    async updatePaymentStatus(
+        id: number,
+        paymentStatus: 'PAID' | 'UNPAID' | 'PARTIAL',
+        paymentMethod?: 'CASH' | 'ONLINE' | 'MIXED'
+    ): Promise<HistoryRecord> {
+        try {
+            console.log(`🔄 Updating payment status for history ${id}:`, { paymentStatus, paymentMethod });
+            const response = await apiClient.put<HistoryRecord>(`/checkout-history/${id}/payment-status`, {
+                paymentStatus,
+                paymentMethod
+            });
+            console.log('✅ Payment status updated:', response.data);
+            return response.data;
+        } catch (error: any) {
+            console.error('❌ Update payment status error:', error);
+            throw new Error(error.response?.data?.message || 'Không thể cập nhật trạng thái thanh toán');
         }
     }
 }

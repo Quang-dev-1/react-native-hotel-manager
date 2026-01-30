@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
 
-const RAILWAY_DOMAIN = 'hotel-manager-backend-production.up.railway.app';
+const RAILWAY_DOMAIN = 'hotel-manager-backend-production-81e4.up.railway.app';
 
 const COMPUTER_IP = '192.168.1.14';
 

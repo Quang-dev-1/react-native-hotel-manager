@@ -219,11 +219,16 @@ export default function BookingFormScreen() {
     const [loading, setLoading] = useState(false);
     const [bookedDates, setBookedDates] = useState<string[]>([]);
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash');
+    const [promotionCode, setPromotionCode] = useState('');
+    const [promotionDiscount, setPromotionDiscount] = useState(0);
+    const [promotionName, setPromotionName] = useState('');
+    const [isValidatingPromotion, setIsValidatingPromotion] = useState(false);
 
     const [errors, setErrors] = useState({
         customerName: '',
         phone: '',
         deposit: '',
+        promotionCode: '',
     });
 
     useEffect(() => {
@@ -297,6 +302,59 @@ export default function BookingFormScreen() {
         setErrors(prev => ({ ...prev, deposit: validateDeposit(text) }));
     };
 
+    const handlePromotionCodeChange = (text: string) => {
+        setPromotionCode(text.toUpperCase());
+        if (!text.trim()) {
+            setPromotionDiscount(0);
+            setPromotionName('');
+            setErrors(prev => ({ ...prev, promotionCode: '' }));
+        }
+    };
+
+    const handleApplyPromotion = async () => {
+        if (!promotionCode.trim()) {
+            Alert.alert('Thông báo', 'Vui lòng nhập mã khuyến mãi');
+            return;
+        }
+
+        try {
+            setIsValidatingPromotion(true);
+            const totalBeforeDiscount = calculateTotal();
+
+            const promotionService = (await import('@/services/promotionService')).default;
+
+            const result = await promotionService.calculateDiscount(
+                promotionCode.trim(),
+                totalBeforeDiscount
+            );
+
+            setPromotionDiscount(result.discount);
+
+            const promotion = await promotionService.getPromotionByCode(promotionCode.trim());
+            setPromotionName(promotion.name);
+
+            Alert.alert(
+                'Thành công',
+                `Đã áp dụng mã "${promotion.name}"\nGiảm giá: ${result.discount.toLocaleString('vi-VN')}đ`
+            );
+            setErrors(prev => ({ ...prev, promotionCode: '' }));
+        } catch (error: any) {
+            setPromotionDiscount(0);
+            setPromotionName('');
+            setErrors(prev => ({ ...prev, promotionCode: error.message }));
+            Alert.alert('Lỗi', error.message || 'Mã khuyến mãi không hợp lệ');
+        } finally {
+            setIsValidatingPromotion(false);
+        }
+    };
+
+    const handleRemovePromotion = () => {
+        setPromotionCode('');
+        setPromotionDiscount(0);
+        setPromotionName('');
+        setErrors(prev => ({ ...prev, promotionCode: '' }));
+    };
+
     const formatDateForAPI = (date: Date) => {
         const year = date.getFullYear();
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -340,9 +398,12 @@ export default function BookingFormScreen() {
     };
 
     const calculateTotal = () => {
-        return room.price * calculateNights();
+        const baseTotal = room.price * calculateNights();
+        return Math.max(0, baseTotal - promotionDiscount);
     };
-
+    const getFinalTotal = () => {
+        return calculateTotal();
+    };
     const checkDateOverlap = (checkIn: string, checkOut: string): boolean => {
         const checkInDate = new Date(checkIn);
         const checkOutDate = new Date(checkOut);
@@ -365,6 +426,7 @@ export default function BookingFormScreen() {
             customerName: nameError,
             phone: phoneError,
             deposit: depositError,
+            promotionCode: '', // Reset promotion error
         });
 
         if (nameError || phoneError || depositError) {
@@ -401,7 +463,7 @@ export default function BookingFormScreen() {
         }
 
         const depositAmount = deposit ? parseFloat(deposit) : 0;
-        const totalAmount = calculateTotal();
+        const totalAmount = getFinalTotal(); // Sử dụng getFinalTotal() thay vì calculateTotal()
 
         if (depositAmount > totalAmount) {
             Alert.alert('Lỗi', 'Tiền cọc không thể lớn hơn tổng tiền phòng');
@@ -417,11 +479,12 @@ export default function BookingFormScreen() {
                 phone: phone.trim(),
                 checkIn: checkInStr,
                 checkOut: checkOutStr,
-                deposit: 0,
+                deposit: depositAmount,
                 notes: notes.trim(),
+                promotionCode: promotionCode.trim() || undefined, // Thêm promotionCode
             };
 
-            console.log('📤 Submitting booking:', bookingData);
+            console.log('📤 Submitting booking with promotion:', bookingData);
 
             const newBooking = await bookingService.createBooking(bookingData);
 
@@ -435,18 +498,7 @@ export default function BookingFormScreen() {
                         roomNumber: room.roomNumber,
                     }
                 });
-            }
-            else if (paymentMethod === 'cash' && depositAmount > 0) {
-                // Cập nhật deposit cho booking
-                await bookingService.updateBooking(newBooking.id!, {
-                    customerName: customerName.trim(),
-                    phone: phone.trim(),
-                    checkIn: checkInStr,
-                    checkOut: checkOutStr,
-                    deposit: depositAmount,
-                    notes: notes.trim(),
-                });
-
+            } else {
                 const activeBookings = await bookingService.getActiveBookings();
                 const hasActiveBooking = activeBookings.some(
                     b => b.roomId === room.id && b.status === 'CHECKED_IN'
@@ -456,27 +508,15 @@ export default function BookingFormScreen() {
                     ? 'Booking đã được tạo với trạng thái CHỜ XÁC NHẬN.\n\nLưu ý: Phòng này đang có khách đang ở. Bạn chỉ có thể xác nhận booking này sau khi khách hiện tại trả phòng.'
                     : 'Booking đã được tạo thành công!';
 
-                Alert.alert(
-                    'Thành công',
-                    `${statusMessage}\n\nThông tin:\n• Số đêm: ${nights} đêm\n• Tổng tiền: ${totalAmount.toLocaleString('vi-VN')}đ\n• Đặt cọc: ${depositAmount.toLocaleString('vi-VN')}đ`,
-                    [{ text: 'OK', onPress: () => navigation.goBack() }]
-                );
-            }
-            else {
-                const activeBookings = await bookingService.getActiveBookings();
-                const hasActiveBooking = activeBookings.some(
-                    b => b.roomId === room.id && b.status === 'CHECKED_IN'
-                );
+                let message = `${statusMessage}\n\nThông tin:\n• Số đêm: ${nights} đêm\n• Tổng tiền: ${totalAmount.toLocaleString('vi-VN')}đ`;
 
-                const statusMessage = hasActiveBooking
-                    ? 'Booking đã được tạo với trạng thái CHỜ XÁC NHẬN.\n\nLưu ý: Phòng này đang có khách đang ở. Bạn chỉ có thể xác nhận booking này sau khi khách hiện tại trả phòng.'
-                    : 'Booking đã được tạo thành công!';
+                if (promotionDiscount > 0) {
+                    message += `\n• Đã giảm: ${promotionDiscount.toLocaleString('vi-VN')}đ`;
+                }
 
-                Alert.alert(
-                    'Thành công',
-                    `${statusMessage}\n\nThông tin:\n• Số đêm: ${nights} đêm\n• Tổng tiền: ${totalAmount.toLocaleString('vi-VN')}đ`,
-                    [{ text: 'OK', onPress: () => navigation.goBack() }]
-                );
+                Alert.alert('Thành công', message, [
+                    { text: 'OK', onPress: () => navigation.goBack() }
+                ]);
             }
         } catch (error: any) {
             console.error('❌ Booking error:', error);
@@ -485,6 +525,7 @@ export default function BookingFormScreen() {
             setLoading(false);
         }
     };
+
 
     const getMinCheckOutDate = () => {
         const minDate = new Date(checkInDate);
@@ -597,12 +638,79 @@ export default function BookingFormScreen() {
                             <Text style={styles.summaryLabel}>Giá mỗi đêm:</Text>
                             <Text style={styles.summaryValue}>{room.price.toLocaleString('vi-VN')}đ</Text>
                         </View>
+                        <View style={styles.summaryRow}>
+                            <Text style={styles.summaryLabel}>Tạm tính:</Text>
+                            <Text style={styles.summaryValue}>
+                                {(room.price * calculateNights()).toLocaleString('vi-VN')}đ
+                            </Text>
+                        </View>
+                        {promotionDiscount > 0 && (
+                            <View style={styles.summaryRow}>
+                                <Text style={[styles.summaryLabel, { color: '#22c55e' }]}>Giảm giá:</Text>
+                                <Text style={[styles.summaryValue, { color: '#22c55e' }]}>
+                                    -{promotionDiscount.toLocaleString('vi-VN')}đ
+                                </Text>
+                            </View>
+                        )}
                         <View style={[styles.summaryRow, styles.summaryRowTotal]}>
                             <Text style={styles.summaryLabelTotal}>Tổng tiền:</Text>
-                            <Text style={styles.summaryValueHighlight}>{calculateTotal().toLocaleString('vi-VN')}đ</Text>
+                            <Text style={styles.summaryValueHighlight}>
+                                {getFinalTotal().toLocaleString('vi-VN')}đ
+                            </Text>
                         </View>
                     </View>
                 )}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Mã khuyến mãi</Text>
+                    <View style={styles.promotionContainer}>
+                        <View style={[styles.inputWrapper, { flex: 1 }, errors.promotionCode ? styles.inputError : null]}>
+                            <Ionicons name="pricetag-outline" size={20} color="#64748b" />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Nhập mã khuyến mãi"
+                                value={promotionCode}
+                                onChangeText={handlePromotionCodeChange}
+                                placeholderTextColor="#94a3b8"
+                                editable={!loading && promotionDiscount === 0}
+                                autoCapitalize="characters"
+                            />
+                        </View>
+                        {promotionDiscount === 0 ? (
+                            <TouchableOpacity
+                                style={[styles.applyButton, isValidatingPromotion && styles.applyButtonDisabled]}
+                                onPress={handleApplyPromotion}
+                                disabled={loading || isValidatingPromotion || !promotionCode.trim()}>
+                                {isValidatingPromotion ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Text style={styles.applyButtonText}>Áp dụng</Text>
+                                )}
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.removeButton}
+                                onPress={handleRemovePromotion}
+                                disabled={loading}>
+                                <Ionicons name="close-circle" size={20} color="#ef4444" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    {errors.promotionCode ? <Text style={styles.errorText}>{errors.promotionCode}</Text> : null}
+                    {promotionDiscount > 0 && (
+                        <View style={styles.promotionAppliedBox}>
+                            <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.promotionAppliedText}>
+                                    {promotionName || 'Mã khuyến mãi'}
+                                </Text>
+                                <Text style={styles.promotionDiscountText}>
+                                    Giảm giá: {promotionDiscount.toLocaleString('vi-VN')}đ
+                                </Text>
+                            </View>
+                        </View>
+                    )}
+                </View>
+
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>
@@ -1233,5 +1341,56 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '700',
         color: '#64748b'
+    },
+    promotionContainer: {
+        flexDirection: 'row',
+        gap: 8,
+        alignItems: 'flex-start',
+    },
+    applyButton: {
+        backgroundColor: '#4a90e2',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        minWidth: 80,
+    },
+    applyButtonDisabled: {
+        opacity: 0.6,
+    },
+    applyButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    removeButton: {
+        backgroundColor: '#fee2e2',
+        paddingHorizontal: 12,
+        paddingVertical: 14,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    promotionAppliedBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#f0fdf4',
+        padding: 12,
+        borderRadius: 12,
+        marginTop: 8,
+        borderWidth: 1,
+        borderColor: '#bbf7d0',
+    },
+    promotionAppliedText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#166534',
+    },
+    promotionDiscountText: {
+        fontSize: 13,
+        color: '#22c55e',
+        marginTop: 2,
     },
 });

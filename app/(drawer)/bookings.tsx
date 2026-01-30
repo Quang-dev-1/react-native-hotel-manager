@@ -55,7 +55,6 @@ const BookingDetailModal = ({
         }
     };
 
-    // Kiểm tra xem có thể xác nhận/nhận phòng không
     const canConfirm = booking.status === 'PENDING' && !hasActiveBookingForRoom;
     const canCheckIn = booking.status === 'CONFIRMED' && !hasActiveBookingForRoom;
 
@@ -88,7 +87,6 @@ const BookingDetailModal = ({
                                 </View>
                             </View>
 
-                            {/* Cảnh báo nếu có booking đang active */}
                             {hasActiveBookingForRoom && booking.status !== 'CHECKED_IN' && (
                                 <View style={styles.warningBox}>
                                     <Ionicons name="warning" size={20} color="#f59e0b" />
@@ -285,27 +283,59 @@ export default function BookingsScreen() {
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
-    const getDaysFromTodayToEndOfMonth = () => {
+    // ===== THÊM STATE CHO THÁNG =====
+    const [selectedMonth, setSelectedMonth] = useState(0); // 0 = tháng hiện tại, 1 = tháng sau, 2 = tháng sau nữa
+
+    // ===== HÀM TẠO DANH SÁCH NGÀY THEO THÁNG ĐƯỢC CHỌN =====
+    const getDaysForMonth = (monthOffset: number) => {
         const days = [];
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const year = today.getFullYear();
-        const month = today.getMonth();
+
+        // Tính tháng cần hiển thị
+        const targetDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+        const year = targetDate.getFullYear();
+        const month = targetDate.getMonth();
+
+        // Ngày đầu tiên: hôm nay nếu là tháng hiện tại, ngày 1 nếu là tháng sau
+        let startDate = monthOffset === 0 ? new Date(today) : new Date(year, month, 1);
+
+        // Ngày cuối cùng: ngày cuối tháng
         const lastDayOfMonth = new Date(year, month + 1, 0);
         lastDayOfMonth.setHours(0, 0, 0, 0);
-        let currentDate = new Date(today);
+
+        let currentDate = new Date(startDate);
 
         while (currentDate <= lastDayOfMonth) {
             days.push({
-                date: currentDate.toLocaleDateString('en-CA'),
+                date: currentDate.toLocaleDateString('en-CA'), // YYYY-MM-DD
                 display: `${currentDate.getDate()}/${currentDate.getMonth() + 1}`,
             });
             currentDate.setDate(currentDate.getDate() + 1);
         }
+
         return days;
     };
 
-    const [dates] = useState(getDaysFromTodayToEndOfMonth());
+    // ===== CẬP NHẬT DATES KHI CHỌN THÁNG =====
+    const [dates, setDates] = useState(getDaysForMonth(0));
+
+    // Khi selectedMonth thay đổi, cập nhật lại dates
+    const handleMonthChange = (monthOffset: number) => {
+        setSelectedMonth(monthOffset);
+        setDates(getDaysForMonth(monthOffset));
+    };
+
+    // ===== HÀM LẤY TÊN THÁNG =====
+    const getMonthName = (monthOffset: number) => {
+        const today = new Date();
+        const targetDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+        const monthNames = [
+            'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+            'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+        ];
+        return `${monthNames[targetDate.getMonth()]} ${targetDate.getFullYear()}`;
+    };
 
     const fetchData = async () => {
         try {
@@ -345,7 +375,6 @@ export default function BookingsScreen() {
         });
     };
 
-    // Kiểm tra xem phòng có booking nào đang CHECKED_IN không
     const hasActiveCheckedInBooking = (roomId: number): boolean => {
         return bookings.some(
             booking => booking.roomId === roomId && booking.status === 'CHECKED_IN'
@@ -356,7 +385,6 @@ export default function BookingsScreen() {
         const roomBookings = getBookingsForRoomAndDate(room.id!, date);
 
         if (roomBookings.length > 0) {
-            // Nếu có nhiều booking, hiển thị booking đầu tiên (hoặc có thể cho chọn)
             setSelectedBooking(roomBookings[0]);
             setShowDetailModal(true);
         } else {
@@ -383,7 +411,6 @@ export default function BookingsScreen() {
                                     text: 'OK',
                                     onPress: () => {
                                         fetchData();
-
                                     }
                                 }
                             ]);
@@ -458,7 +485,6 @@ export default function BookingsScreen() {
                                 text: 'OK',
                                 onPress: () => {
                                     fetchData();
-
                                 }
                             }
                         ]);
@@ -537,6 +563,33 @@ export default function BookingsScreen() {
                         <Ionicons name="menu" size={28} color="#fff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Lịch đặt phòng</Text>
+                </View>
+
+                {/* ===== THÊM MONTH SELECTOR ===== */}
+                <View style={styles.monthSelector}>
+                    <TouchableOpacity
+                        style={[styles.monthButton, selectedMonth === 0 && styles.monthButtonActive]}
+                        onPress={() => handleMonthChange(0)}>
+                        <Text style={[styles.monthButtonText, selectedMonth === 0 && styles.monthButtonTextActive]}>
+                            {getMonthName(0)}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.monthButton, selectedMonth === 1 && styles.monthButtonActive]}
+                        onPress={() => handleMonthChange(1)}>
+                        <Text style={[styles.monthButtonText, selectedMonth === 1 && styles.monthButtonTextActive]}>
+                            {getMonthName(1)}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.monthButton, selectedMonth === 2 && styles.monthButtonActive]}
+                        onPress={() => handleMonthChange(2)}>
+                        <Text style={[styles.monthButtonText, selectedMonth === 2 && styles.monthButtonTextActive]}>
+                            {getMonthName(2)}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </LinearGradient>
 
@@ -666,6 +719,32 @@ const styles = StyleSheet.create({
         color: '#fff',
         flex: 1,
     },
+    // ===== THÊM STYLES CHO MONTH SELECTOR =====
+    monthSelector: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 16,
+    },
+    monthButton: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        alignItems: 'center',
+    },
+    monthButtonActive: {
+        backgroundColor: '#fff',
+    },
+    monthButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: 'rgba(255, 255, 255, 0.8)',
+    },
+    monthButtonTextActive: {
+        color: '#4a90e2',
+    },
+    // ===== KẾT THÚC MONTH SELECTOR STYLES =====
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',

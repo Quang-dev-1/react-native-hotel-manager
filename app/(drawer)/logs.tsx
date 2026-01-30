@@ -61,7 +61,11 @@ export default function LogsScreen() {
     const loadServicesInBackground = async (historyData: HistoryRecord[]) => {
         for (const record of historyData) {
             if (record.id && record.bookingId) {
-                fetchHistoryWithServices(record.id, record.bookingId);
+                try {
+                    await fetchHistoryWithServices(record.id, record.bookingId);
+                } catch (error) {
+                    console.log(`Skipping booking ${record.bookingId} - already completed`);
+                }
             }
         }
     };
@@ -300,20 +304,40 @@ export default function LogsScreen() {
                                     </Text>
                                 </View>
                             )}
+                            {record.promotionCode && record.discountAmount && record.discountAmount > 0 && (
+                                <View style={styles.promotionSection}>
+                                    <View style={styles.promotionHeader}>
+                                        <Ionicons name="pricetag" size={14} color="#8b5cf6" />
+                                        <Text style={styles.promotionHeaderText}>Khuyến mãi</Text>
+                                    </View>
+                                    <View style={styles.amountRow}>
+                                        <Text style={styles.promotionCodeLabel}>
+                                            {record.promotionCode}
+                                            {record.promotionName && ` - ${record.promotionName}`}
+                                        </Text>
+                                        <Text style={styles.promotionDiscountValue}>
+                                            -{record.discountAmount.toLocaleString('vi-VN')}đ
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+
                             <View style={styles.amountRow}>
                                 <Text style={styles.amountLabel}>Tổng cộng:</Text>
                                 <Text style={styles.amountValue}>
-                                    {(record.roomAmount + record.serviceAmount).toLocaleString('vi-VN')}đ
+                                    {(record.roomAmount + record.serviceAmount - (record.discountAmount || 0)).toLocaleString('vi-VN')}đ
                                 </Text>
                             </View>
+
                             <View style={styles.amountRow}>
                                 <Text style={styles.amountLabel}>Đã đặt cọc:</Text>
                                 <Text style={styles.amountValue}>
                                     {record.deposit.toLocaleString('vi-VN')}đ
                                 </Text>
                             </View>
+
                             <View style={styles.totalRow}>
-                                <Text style={styles.totalLabel}>Còn phải thu:</Text>
+                                <Text style={styles.totalLabel}>Đã thu khi trả phòng:</Text>
                                 <Text style={styles.totalValue}>
                                     {record.totalAmount.toLocaleString('vi-VN')}đ
                                 </Text>
@@ -749,5 +773,35 @@ const styles = StyleSheet.create({
     },
     paginationNumberTextActive: {
         color: '#fff',
+    },
+    promotionSection: {
+        backgroundColor: '#faf5ff',
+        padding: 8,
+        borderRadius: 8,
+        marginVertical: 4,
+        borderWidth: 1,
+        borderColor: '#e9d5ff',
+    },
+    promotionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 6,
+    },
+    promotionHeaderText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#8b5cf6',
+    },
+    promotionCodeLabel: {
+        fontSize: 13,
+        color: '#6b21a8',
+        fontWeight: '500',
+        flex: 1,
+    },
+    promotionDiscountValue: {
+        fontSize: 14,
+        color: '#22c55e',
+        fontWeight: '700',
     },
 });

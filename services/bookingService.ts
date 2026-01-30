@@ -9,10 +9,15 @@ export interface Booking {
   checkIn: string;
   checkOut: string;
   nights: number;
+  roomAmount?: number;
+  serviceAmount?: number;
+  discountAmount?: number;
   totalAmount: number;
   deposit: number;
   status: string;
   notes?: string;
+  promotionCode?: string;
+  promotionName?: string;
   createdAt?: string;
 }
 
@@ -24,6 +29,7 @@ export interface CreateBookingRequest {
   checkOut: string;
   deposit: number;
   notes?: string;
+  promotionCode?: string;
 }
 
 export interface DashboardStats {
@@ -46,6 +52,7 @@ export interface BookingWithServices {
   nights: number;
   roomAmount: number;
   serviceAmount: number;
+  discountAmount?: number;
   totalAmount: number;
   deposit: number;
   status: string;
@@ -58,6 +65,14 @@ export interface BookingWithServices {
     quantity: number;
     price: number;
     totalPrice: number;
+  }[];
+  promotions?: {
+    id: number;
+    promotionId: number;
+    promotionCode: string;
+    promotionName: string;
+    discountAmount: number;
+    appliedAt: string;
   }[];
 }
 

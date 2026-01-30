@@ -66,189 +66,202 @@ const InvoiceModal = ({
         let servicesHTML = '';
         if (recordWithServices?.services && recordWithServices.services.length > 0) {
             servicesHTML = `
+            <tr>
+                <td colspan="2" style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">Dịch vụ sử dụng:</td>
+            </tr>
+            ${recordWithServices.services.map((service: any) => `
                 <tr>
-                    <td colspan="2" style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">Dịch vụ sử dụng:</td>
+                    <td style="padding: 8px 8px 8px 24px; border-bottom: 1px solid #e2e8f0;">• ${service.serviceName} x${service.quantity}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${service.totalPrice.toLocaleString('vi-VN')}đ</td>
                 </tr>
-                ${recordWithServices.services.map((service: any) => `
-                    <tr>
-                        <td style="padding: 8px 8px 8px 24px; border-bottom: 1px solid #e2e8f0;">• ${service.serviceName} x${service.quantity}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${service.totalPrice.toLocaleString('vi-VN')}đ</td>
-                    </tr>
-                `).join('')}
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">Tổng dịch vụ:</td>
-                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${record.serviceAmount.toLocaleString('vi-VN')}đ</td>
-                </tr>
-            `;
+            `).join('')}
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">Tổng dịch vụ:</td>
+                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${record.serviceAmount.toLocaleString('vi-VN')}đ</td>
+            </tr>
+        `;
         } else if (record.serviceAmount > 0) {
             servicesHTML = `
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">Dịch vụ:</td>
-                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${record.serviceAmount.toLocaleString('vi-VN')}đ</td>
-                </tr>
-            `;
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">Dịch vụ:</td>
+                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${record.serviceAmount.toLocaleString('vi-VN')}đ</td>
+            </tr>
+        `;
         }
 
+        // ✅ THÊM PROMOTION HTML
+        const promotionHTML = (record.promotionCode && record.discountAmount && record.discountAmount > 0) ? `
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">Khuyến mãi (${record.promotionCode}):</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #22c55e; font-weight: 600;">-${record.discountAmount.toLocaleString('vi-VN')}đ</td>
+        </tr>
+    ` : '';
+
         const notesHTML = record.notes ? `
-            <div style="margin-top: 24px; padding: 16px; background-color: #f8fafc; border-radius: 8px;">
-                <div style="font-weight: 700; font-size: 13px; color: #64748b; margin-bottom: 8px;">GHI CHÚ</div>
-                <div style="font-size: 14px; color: #64748b;">${record.notes}</div>
-            </div>
-        ` : '';
+        <div style="margin-top: 24px; padding: 16px; background-color: #f8fafc; border-radius: 8px;">
+            <div style="font-weight: 700; font-size: 13px; color: #64748b; margin-bottom: 8px;">GHI CHÚ</div>
+            <div style="font-size: 14px; color: #64748b;">${record.notes}</div>
+        </div>
+    ` : '';
+
+        // ✅ TÍNH TOÁN ĐÚNG
+        const totalBeforeDiscount = record.roomAmount + record.serviceAmount;
+        const totalAfterDiscount = totalBeforeDiscount - (record.discountAmount || 0);
 
         return `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>Hóa đơn thanh toán</title>
-                <style>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Hóa đơn thanh toán</title>
+            <style>
+                body {
+                    font-family: 'Arial', sans-serif;
+                    padding: 20px;
+                    max-width: 800px;
+                    margin: 0 auto;
+                }
+                .header {
+                    text-align: center;
+                    margin-bottom: 30px;
+                    border-bottom: 3px solid #4a90e2;
+                    padding-bottom: 20px;
+                }
+                .hotel-name {
+                    font-size: 28px;
+                    font-weight: bold;
+                    color: #1e293b;
+                    margin-bottom: 8px;
+                }
+                .hotel-info {
+                    font-size: 14px;
+                    color: #64748b;
+                    margin: 4px 0;
+                }
+                .invoice-title {
+                    font-size: 24px;
+                    font-weight: bold;
+                    color: #4a90e2;
+                    margin-top: 20px;
+                }
+                .section {
+                    margin-bottom: 24px;
+                }
+                .section-title {
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: #64748b;
+                    margin-bottom: 12px;
+                    letter-spacing: 0.5px;
+                    border-bottom: 2px solid #e2e8f0;
+                    padding-bottom: 8px;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                td {
+                    padding: 8px;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                .total-row {
+                    border-top: 3px solid #4a90e2;
+                    font-weight: bold;
+                    font-size: 18px;
+                    color: #4a90e2;
+                }
+                .timestamp {
+                    text-align: center;
+                    font-size: 12px;
+                    color: #94a3b8;
+                    margin-top: 40px;
+                    padding-top: 20px;
+                    border-top: 1px solid #e2e8f0;
+                }
+                @media print {
                     body {
-                        font-family: 'Arial', sans-serif;
-                        padding: 20px;
-                        max-width: 800px;
-                        margin: 0 auto;
+                        padding: 10px;
                     }
-                    .header {
-                        text-align: center;
-                        margin-bottom: 30px;
-                        border-bottom: 3px solid #4a90e2;
-                        padding-bottom: 20px;
-                    }
-                    .hotel-name {
-                        font-size: 28px;
-                        font-weight: bold;
-                        color: #1e293b;
-                        margin-bottom: 8px;
-                    }
-                    .hotel-info {
-                        font-size: 14px;
-                        color: #64748b;
-                        margin: 4px 0;
-                    }
-                    .invoice-title {
-                        font-size: 24px;
-                        font-weight: bold;
-                        color: #4a90e2;
-                        margin-top: 20px;
-                    }
-                    .section {
-                        margin-bottom: 24px;
-                    }
-                    .section-title {
-                        font-size: 13px;
-                        font-weight: 700;
-                        color: #64748b;
-                        margin-bottom: 12px;
-                        letter-spacing: 0.5px;
-                        border-bottom: 2px solid #e2e8f0;
-                        padding-bottom: 8px;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                    }
-                    td {
-                        padding: 8px;
-                        border-bottom: 1px solid #e2e8f0;
-                    }
-                    .total-row {
-                        border-top: 3px solid #4a90e2;
-                        font-weight: bold;
-                        font-size: 18px;
-                        color: #4a90e2;
-                    }
-                    .timestamp {
-                        text-align: center;
-                        font-size: 12px;
-                        color: #94a3b8;
-                        margin-top: 40px;
-                        padding-top: 20px;
-                        border-top: 1px solid #e2e8f0;
-                    }
-                    @media print {
-                        body {
-                            padding: 10px;
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <div class="hotel-name">HOTEL START</div>
-                    <div class="hotel-info">Địa chỉ: Quy Nhơn</div>
-                    <div class="hotel-info">Số điện thoại: 0367287044</div>
-                    <div class="invoice-title">HÓA ĐƠN THANH TOÁN</div>
-                </div>
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="hotel-name">HOTEL START</div>
+                <div class="hotel-info">Địa chỉ: Quy Nhơn</div>
+                <div class="hotel-info">Số điện thoại: 0367287044</div>
+                <div class="invoice-title">HÓA ĐƠN THANH TOÁN</div>
+            </div>
 
-                <div class="section">
-                    <div class="section-title">THÔNG TIN KHÁCH HÀNG</div>
-                    <table>
-                        <tr>
-                            <td style="width: 30%;">Họ tên:</td>
-                            <td style="font-weight: 600;">${record.customerName}</td>
-                        </tr>
-                        <tr>
-                            <td>Số điện thoại:</td>
-                            <td style="font-weight: 600;">${record.phone}</td>
-                        </tr>
-                    </table>
-                </div>
+            <div class="section">
+                <div class="section-title">THÔNG TIN KHÁCH HÀNG</div>
+                <table>
+                    <tr>
+                        <td style="width: 30%;">Họ tên:</td>
+                        <td style="font-weight: 600;">${record.customerName}</td>
+                    </tr>
+                    <tr>
+                        <td>Số điện thoại:</td>
+                        <td style="font-weight: 600;">${record.phone}</td>
+                    </tr>
+                </table>
+            </div>
 
-                <div class="section">
-                    <div class="section-title">THÔNG TIN PHÒNG</div>
-                    <table>
-                        <tr>
-                            <td style="width: 30%;">Số phòng:</td>
-                            <td style="font-weight: 600;">Phòng ${record.roomNumber}</td>
-                        </tr>
-                        <tr>
-                            <td>Check-in:</td>
-                            <td style="font-weight: 600;">${formatDate(record.checkIn)}</td>
-                        </tr>
-                        <tr>
-                            <td>Check-out:</td>
-                            <td style="font-weight: 600;">${formatDate(record.checkOut)}</td>
-                        </tr>
-                        <tr>
-                            <td>Số đêm:</td>
-                            <td style="font-weight: 600;">${record.nights} đêm</td>
-                        </tr>
-                    </table>
-                </div>
+            <div class="section">
+                <div class="section-title">THÔNG TIN PHÒNG</div>
+                <table>
+                    <tr>
+                        <td style="width: 30%;">Số phòng:</td>
+                        <td style="font-weight: 600;">Phòng ${record.roomNumber}</td>
+                    </tr>
+                    <tr>
+                        <td>Check-in:</td>
+                        <td style="font-weight: 600;">${formatDate(record.checkIn)}</td>
+                    </tr>
+                    <tr>
+                        <td>Check-out:</td>
+                        <td style="font-weight: 600;">${formatDate(record.checkOut)}</td>
+                    </tr>
+                    <tr>
+                        <td>Số đêm:</td>
+                        <td style="font-weight: 600;">${record.nights} đêm</td>
+                    </tr>
+                </table>
+            </div>
 
-                <div class="section">
-                    <div class="section-title">CHI TIẾT THANH TOÁN</div>
-                    <table>
-                        <tr>
-                            <td style="width: 60%;">Tiền phòng (${record.nights} đêm):</td>
-                            <td style="text-align: right; font-weight: 600;">${record.roomAmount.toLocaleString('vi-VN')}đ</td>
-                        </tr>
-                        ${servicesHTML}
-                        <tr>
-                            <td>Tổng cộng:</td>
-                            <td style="text-align: right; font-weight: 600;">${(record.roomAmount + record.serviceAmount).toLocaleString('vi-VN')}đ</td>
-                        </tr>
-                        <tr>
-                            <td>Đã đặt cọc:</td>
-                            <td style="text-align: right; font-weight: 600; color: #22c55e;">-${record.deposit.toLocaleString('vi-VN')}đ</td>
-                        </tr>
-                        <tr class="total-row">
-                            <td style="padding-top: 16px;">TỔNG THANH TOÁN:</td>
-                            <td style="text-align: right; padding-top: 16px;">${record.totalAmount.toLocaleString('vi-VN')}đ</td>
-                        </tr>
-                    </table>
-                </div>
+            <div class="section">
+                <div class="section-title">CHI TIẾT THANH TOÁN</div>
+                <table>
+                    <tr>
+                        <td style="width: 60%;">Tiền phòng (${record.nights} đêm):</td>
+                        <td style="text-align: right; font-weight: 600;">${record.roomAmount.toLocaleString('vi-VN')}đ</td>
+                    </tr>
+                    ${servicesHTML}
+                    ${promotionHTML}
+                    <tr>
+                        <td>Tổng cộng:</td>
+                        <td style="text-align: right; font-weight: 600;">${totalAfterDiscount.toLocaleString('vi-VN')}đ</td>
+                    </tr>
+                    <tr>
+                        <td>Đã đặt cọc:</td>
+                        <td style="text-align: right; font-weight: 600; color: #22c55e;">-${record.deposit.toLocaleString('vi-VN')}đ</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td style="padding-top: 16px;">ĐÃ THU KHI TRẢ PHÒNG:</td>
+                        <td style="text-align: right; padding-top: 16px;">${record.totalAmount.toLocaleString('vi-VN')}đ</td>
+                    </tr>
+                </table>
+            </div>
 
-                ${notesHTML}
+            ${notesHTML}
 
-                <div class="timestamp">
-                    Ngày tạo: ${formatDateTime(record.createdAt || record.actualCheckOut)}
-                </div>
-            </body>
-            </html>
-        `;
+            <div class="timestamp">
+                Ngày tạo: ${formatDateTime(record.createdAt || record.actualCheckOut)}
+            </div>
+        </body>
+        </html>
+    `;
     };
 
     const handlePrint = async () => {
@@ -380,15 +393,29 @@ const InvoiceModal = ({
                                 </View>
                             ) : null}
 
+                            {/* ✅ THÊM HIỂN THỊ KHUYẾN MÃI */}
+                            {record.promotionCode && record.discountAmount && record.discountAmount > 0 && (
+                                <View style={styles.billRow}>
+                                    <Text style={styles.billLabel}>
+                                        Khuyến mãi ({record.promotionCode}):
+                                    </Text>
+                                    <Text style={[styles.billValue, { color: '#22c55e' }]}>
+                                        -{record.discountAmount.toLocaleString('vi-VN')}đ
+                                    </Text>
+                                </View>
+                            )}
+
                             <View style={styles.divider} />
 
+                            {/* ✅ TỔNG CỘNG = room + service - discount */}
                             <View style={styles.billRow}>
                                 <Text style={styles.billLabel}>Tổng cộng:</Text>
                                 <Text style={styles.billValue}>
-                                    {(record.roomAmount + record.serviceAmount).toLocaleString('vi-VN')}đ
+                                    {(record.roomAmount + record.serviceAmount - (record.discountAmount || 0)).toLocaleString('vi-VN')}đ
                                 </Text>
                             </View>
 
+                            {/* ✅ TIỀN CỌC */}
                             <View style={styles.billRow}>
                                 <Text style={styles.billLabel}>Đã đặt cọc:</Text>
                                 <Text style={[styles.billValue, { color: '#22c55e' }]}>
@@ -396,8 +423,9 @@ const InvoiceModal = ({
                                 </Text>
                             </View>
 
+                            {/* ✅ ĐÃ THU KHI TRẢ PHÒNG */}
                             <View style={styles.totalRow}>
-                                <Text style={styles.totalLabel}>TỔNG THANH TOÁN:</Text>
+                                <Text style={styles.totalLabel}>ĐÃ THU KHI TRẢ PHÒNG:</Text>
                                 <Text style={styles.totalValue}>
                                     {record.totalAmount.toLocaleString('vi-VN')}đ
                                 </Text>

@@ -59,7 +59,7 @@ export default function Index() {
           </View>
           <View style={styles.vWelcomme} >
             <Animated.Text style={[styles.tWelcomme, { opacity: fadeAnim }]}>
-              HotelManager welcome!
+              HotelManager
             </Animated.Text>
           </View>
         </Animated.View>

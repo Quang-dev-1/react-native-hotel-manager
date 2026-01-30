@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AddRoomModal from '../../components/AddRoomModal';
+import EditRoomModal from '../../components/EditRoomModal';
 import roomService, { Room } from '../../services/roomService';
 
 export default function RoomsScreen() {
@@ -11,6 +12,8 @@ export default function RoomsScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
     const fetchRooms = useCallback(async (isRefreshing = false) => {
         try {
@@ -33,6 +36,11 @@ export default function RoomsScreen() {
     const onRefresh = () => {
         setRefreshing(true);
         fetchRooms(true);
+    };
+
+    const handleEdit = (room: Room) => {
+        setSelectedRoom(room);
+        setShowEditModal(true);
     };
 
     const handleDelete = (id: number) => {
@@ -115,9 +123,14 @@ export default function RoomsScreen() {
                     </Text>
                 )}
             </View>
-            <TouchableOpacity onPress={() => handleDelete(item.id!)} style={styles.deleteButton}>
-                <Ionicons name="trash-outline" size={20} color="#ef4444" />
-            </TouchableOpacity>
+            <View style={styles.actionButtons}>
+                <TouchableOpacity onPress={() => handleEdit(item)} style={styles.editButton}>
+                    <Ionicons name="create-outline" size={20} color="#3b82f6" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDelete(item.id!)} style={styles.deleteButton}>
+                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                </TouchableOpacity>
+            </View>
         </View>
     );
 
@@ -167,6 +180,16 @@ export default function RoomsScreen() {
             <AddRoomModal
                 visible={showAddModal}
                 onClose={() => setShowAddModal(false)}
+                onSuccess={() => fetchRooms()}
+            />
+
+            <EditRoomModal
+                visible={showEditModal}
+                room={selectedRoom}
+                onClose={() => {
+                    setShowEditModal(false);
+                    setSelectedRoom(null);
+                }}
                 onSuccess={() => fetchRooms()}
             />
         </View>
@@ -282,9 +305,15 @@ const styles = StyleSheet.create({
         marginTop: 4,
         lineHeight: 16
     },
+    actionButtons: {
+        justifyContent: 'center',
+        gap: 8
+    },
+    editButton: {
+        padding: 8
+    },
     deleteButton: {
-        padding: 8,
-        justifyContent: 'center'
+        padding: 8
     },
     emptyContainer: {
         flex: 1,

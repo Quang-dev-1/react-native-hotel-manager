@@ -1,3 +1,4 @@
+import CheckoutPaymentModal from '@/components/CheckoutPaymentModal';
 import EditBookingModal, { UpdateBookingData } from '@/components/EditBookingModal';
 import bookingService, { Booking } from '@/services/bookingService';
 import financeService from '@/services/financeService';
@@ -35,7 +36,6 @@ const ServiceModal = ({
     const [selectedService, setSelectedService] = useState<HotelService | null>(null);
     const [quantity, setQuantity] = useState('1');
     const [loading, setLoading] = useState(false);
-
 
     useEffect(() => {
         if (visible && booking) {
@@ -437,6 +437,7 @@ export default function RentalScreen() {
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
     const [bookingsWithServices, setBookingsWithServices] = useState<{ [key: number]: any }>({});
+    const [showCheckoutPaymentModal, setShowCheckoutPaymentModal] = useState(false);
 
 
     const { filter } = (route.params as { filter?: string }) || {};
@@ -583,81 +584,197 @@ export default function RentalScreen() {
     const handleCheckOut = async (booking: Booking) => {
         if (!booking?.id || !booking.roomId) return;
 
-        Alert.alert(
-            'Trả phòng',
-            `Xác nhận khách ${booking.customerName} đã trả phòng ${booking.roomNumber}?\n\nSau khi trả phòng, phòng sẽ chuyển sang trạng thái CẦN DỌN DẸP và thông tin sẽ được lưu vào lịch sử.`,
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Trả phòng',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            const bookingWithServices = await bookingService.getBookingWithServices(booking.id!);
+        // Lấy thông tin booking với services
+        const bookingWithServices = await bookingService.getBookingWithServices(booking.id);
+        const remainingAmount = bookingWithServices.totalAmount - booking.deposit;
 
-                            await bookingService.checkOut(booking.id!);
-
-                            const room = rooms.find(r => r.id === booking.roomId);
-                            if (room?.id) {
-                                await roomService.updateRoomStatus(room.id, 'CLEANING');
-                            }
-                            const remainingAmount = bookingWithServices.totalAmount - booking.deposit;
-
-                            if (remainingAmount > 0) {
-                                await financeService.createTransaction({
-                                    type: 'INCOME',
-                                    category: 'room_rental',
-                                    amount: remainingAmount,
-                                    description: `Thu tiền phòng ${booking.roomNumber} - ${booking.customerName}`,
-                                    transactionDate: new Date().toISOString().split('T')[0],
-                                    paymentMethod: 'CASH',
-                                    bookingId: booking.id
-                                });
-                            }
-
-                            if (booking.deposit > 0) {
-                                await financeService.createTransaction({
-                                    type: 'INCOME',
-                                    category: 'room_rental',
-                                    amount: booking.deposit,
-                                    description: `Tiền cọc phòng ${booking.roomNumber} - ${booking.customerName}`,
-                                    transactionDate: booking.checkIn,
-                                    paymentMethod: 'TRANSFER',
-                                    bookingId: booking.id
-                                });
-                            }
-
-                            const historyData = {
-                                bookingId: booking.id!,
-                                roomNumber: booking.roomNumber || '',
-                                customerName: booking.customerName,
-                                phone: booking.phone,
-                                checkIn: booking.checkIn,
-                                checkOut: booking.checkOut,
-                                actualCheckOut: new Date().toISOString().split('T')[0],
-                                nights: booking.nights,
-                                roomAmount: bookingWithServices.roomAmount,
-                                serviceAmount: bookingWithServices.serviceAmount,
-                                totalAmount: bookingWithServices.totalAmount,
-                                deposit: booking.deposit,
-                                notes: booking.notes,
-                            };
-
-                            await historyService.createHistory(historyData);
-
-                            Alert.alert(
-                                'Thành công',
-                                'Đã trả phòng, chuyển phòng sang trạng thái CẦN DỌN DẸP và lưu vào lịch sử'
-                            );
-                            fetchData();
-                        } catch (error: any) {
-                            console.error('❌ Checkout error:', error);
-                            Alert.alert('Lỗi', error.message || 'Không thể trả phòng');
-                        }
+        // Nếu đã thanh toán đủ (deposit >= totalAmount), trả phòng luôn
+        if (remainingAmount <= 0) {
+            Alert.alert(
+                'Trả phòng',
+                `Xác nhận khách ${booking.customerName} đã trả phòng ${booking.roomNumber}?\n\n✅ Khách đã thanh toán đủ\n\nPhòng sẽ chuyển sang trạng thái CẦN DỌN DẸP.`,
+                [
+                    { text: 'Hủy', style: 'cancel' },
+                    {
+                        text: 'Trả phòng',
+                        style: 'destructive',
+                        onPress: async () => {
+                            await processCheckout(booking, bookingWithServices, 'CASH');
+                        },
                     },
-                },
-            ]
-        );
+                ]
+            );
+            return;
+        }
+
+        setSelectedBooking(booking);
+        setShowCheckoutPaymentModal(true);
+    };
+
+    const handleCheckoutPaymentConfirm = async (paymentMethod: 'cash' | 'online') => {
+        if (!selectedBooking?.id) return;
+
+        try {
+            setShowCheckoutPaymentModal(false);
+
+            const bookingWithServices = await bookingService.getBookingWithServices(selectedBooking.id);
+            const remainingAmount = bookingWithServices.totalAmount - selectedBooking.deposit;
+
+            if (paymentMethod === 'online') {
+                navigation.navigate('CheckoutPaymentScreen', {
+                    bookingId: selectedBooking.id!,
+                    remainingAmount: remainingAmount,
+                    customerName: selectedBooking.customerName,
+                    roomNumber: selectedBooking.roomNumber || '',
+                });
+            } else {
+                Alert.alert(
+                    'Xác nhận trả phòng',
+                    `Thu tiền mặt: ${remainingAmount.toLocaleString('vi-VN')}đ\n\nXác nhận đã thu tiền và trả phòng?`,
+                    [
+                        { text: 'Hủy', style: 'cancel' },
+                        {
+                            text: 'Xác nhận',
+                            onPress: async () => {
+                                await processCheckout(selectedBooking, bookingWithServices, 'CASH');
+                            },
+                        },
+                    ]
+                );
+            }
+        } catch (error: any) {
+            Alert.alert('Lỗi', error.message || 'Không thể xử lý thanh toán');
+        }
+    };
+
+    const processCheckout = async (
+        booking: Booking,
+        bookingWithServices: any,
+        paymentMethod: 'CASH' | 'ONLINE'
+    ) => {
+        try {
+            console.log('🔵 Starting checkout process...');
+
+            await bookingService.checkOut(booking.id!);
+
+            const room = rooms.find(r => r.id === booking.roomId);
+            if (room?.id) {
+                await roomService.updateRoomStatus(room.id, 'CLEANING');
+            }
+
+            // ✅ TÍNH TOÁN ĐÚNG
+            const totalBeforeDiscount = bookingWithServices.roomAmount + bookingWithServices.serviceAmount;
+            const discountAmount = booking.discountAmount || 0;
+            const totalAfterDiscount = totalBeforeDiscount - discountAmount;
+
+            // ✅ 1. Giao dịch tiền cọc (nếu có)
+            if (booking.deposit > 0) {
+                console.log('💰 Creating deposit transaction:', booking.deposit);
+                await financeService.createTransaction({
+                    type: 'INCOME',
+                    category: 'room_rental',
+                    amount: booking.deposit,
+                    description: `Tiền cọc phòng ${booking.roomNumber} - ${booking.customerName}`,
+                    transactionDate: booking.checkIn,
+                    paymentMethod: 'TRANSFER',
+                    bookingId: booking.id
+                });
+            }
+
+            // ✅ 2. Giao dịch tiền phòng còn lại
+            const roomRemainingAmount = bookingWithServices.roomAmount - booking.deposit;
+            if (roomRemainingAmount > 0) {
+                console.log('💰 Creating remaining room transaction:', roomRemainingAmount);
+                await financeService.createTransaction({
+                    type: 'INCOME',
+                    category: 'room_rental',
+                    amount: roomRemainingAmount,
+                    description: `Thu tiền phòng ${booking.roomNumber} - ${booking.customerName} (${paymentMethod === 'CASH' ? 'Tiền mặt' : 'Chuyển khoản'})`,
+                    transactionDate: new Date().toISOString().split('T')[0],
+                    paymentMethod: paymentMethod === 'CASH' ? 'CASH' : 'TRANSFER',
+                    bookingId: booking.id
+                });
+            }
+
+            // ✅ 3. Giao dịch dịch vụ (nếu có)
+            if (bookingWithServices.serviceAmount > 0) {
+                console.log('💰 Creating service transaction:', bookingWithServices.serviceAmount);
+                await financeService.createTransaction({
+                    type: 'INCOME',
+                    category: 'service',
+                    amount: bookingWithServices.serviceAmount,
+                    description: `Dịch vụ phòng ${booking.roomNumber} - ${booking.customerName}`,
+                    transactionDate: new Date().toISOString().split('T')[0],
+                    paymentMethod: paymentMethod === 'CASH' ? 'CASH' : 'TRANSFER',
+                    bookingId: booking.id
+                });
+            }
+
+            // ✅ 4. Giao dịch GIẢM GIÁ (nếu có) - GHI LÀ CHI PHÍ
+            if (discountAmount > 0) {
+                console.log('💰 Creating discount transaction:', discountAmount);
+                await financeService.createTransaction({
+                    type: 'EXPENSE', // ✅ Ghi là CHI PHÍ vì đây là khoản giảm trừ doanh thu
+                    category: 'discount',
+                    amount: discountAmount,
+                    description: `Giảm giá [${booking.promotionCode}] - ${booking.promotionName || 'Khuyến mãi'} - Phòng ${booking.roomNumber}`,
+                    transactionDate: new Date().toISOString().split('T')[0],
+                    paymentMethod: paymentMethod === 'CASH' ? 'CASH' : 'TRANSFER',
+                    bookingId: booking.id
+                });
+            }
+
+            // ✅ 5. Lưu vào lịch sử
+            const historyData = {
+                bookingId: booking.id!,
+                roomNumber: booking.roomNumber || '',
+                customerName: booking.customerName,
+                phone: booking.phone,
+                checkIn: booking.checkIn,
+                checkOut: booking.checkOut,
+                actualCheckOut: new Date().toISOString().split('T')[0],
+                nights: booking.nights,
+                roomAmount: bookingWithServices.roomAmount,
+                serviceAmount: bookingWithServices.serviceAmount,
+                totalAmount: totalAfterDiscount, // ✅ TỔNG SAU GIẢM GIÁ (không trừ deposit)
+                deposit: booking.deposit,
+                notes: booking.notes,
+                paymentStatus: 'PAID' as const,
+                paymentMethod: paymentMethod,
+                promotionCode: booking.promotionCode,
+                promotionName: booking.promotionName,
+                discountAmount: discountAmount,
+            };
+
+            console.log('📝 Creating history record:', historyData);
+            await historyService.createHistory(historyData);
+
+            // ✅ 6. Thông báo thành công
+            const totalCollected = booking.deposit + roomRemainingAmount + bookingWithServices.serviceAmount;
+
+            Alert.alert(
+                'Thành công',
+                `✅ Đã trả phòng và thu tiền thành công\n\n` +
+                `💰 Chi tiết:\n` +
+                `   • Tiền phòng: ${bookingWithServices.roomAmount.toLocaleString('vi-VN')}đ\n` +
+                (bookingWithServices.serviceAmount > 0
+                    ? `   • Dịch vụ: ${bookingWithServices.serviceAmount.toLocaleString('vi-VN')}đ\n`
+                    : '') +
+                (discountAmount > 0
+                    ? `   • Giảm giá: -${discountAmount.toLocaleString('vi-VN')}đ\n`
+                    : '') +
+                `   • Tổng cộng: ${totalAfterDiscount.toLocaleString('vi-VN')}đ\n` +
+                `   • Đã cọc: ${booking.deposit.toLocaleString('vi-VN')}đ\n` +
+                `   • Còn thu: ${(totalAfterDiscount - booking.deposit).toLocaleString('vi-VN')}đ\n\n` +
+                `Phòng đã chuyển sang trạng thái CẦN DỌN DẸP`
+            );
+
+            fetchData();
+            setSelectedBooking(null);
+        } catch (error: any) {
+            console.error('❌ Checkout error:', error);
+            Alert.alert('Lỗi', error.message || 'Không thể trả phòng');
+        }
     };
 
     const handleCleanRoom = async (booking: Booking) => {
@@ -992,6 +1109,24 @@ export default function RentalScreen() {
                                         {booking.checkIn} → {booking.checkOut}
                                     </Text>
                                 </View>
+
+                                {/* Hiển thị promotion nếu có */}
+                                {booking.promotionCode && (
+                                    <View style={styles.promotionInfo}>
+                                        <Ionicons name="pricetag" size={16} color="#8b5cf6" />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.promotionCodeText}>
+                                                {booking.promotionCode}
+                                            </Text>
+                                            {booking.promotionName && (
+                                                <Text style={styles.promotionNameText}>
+                                                    {booking.promotionName}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                )}
+
                                 {booking.status === 'CHECKED_IN' && bookingsWithServices[booking.id!] && (
                                     <>
                                         {bookingsWithServices[booking.id!].services &&
@@ -1021,6 +1156,17 @@ export default function RentalScreen() {
                                             )}
                                     </>
                                 )}
+
+                                {/* Hiển thị giảm giá */}
+                                {booking.discountAmount && booking.discountAmount > 0 && (
+                                    <View style={styles.bookingInfo}>
+                                        <Ionicons name="pricetag-outline" size={16} color="#8b5cf6" />
+                                        <Text style={[styles.bookingInfoText, { color: '#8b5cf6', fontWeight: '600' }]}>
+                                            Giảm giá: {booking.discountAmount.toLocaleString('vi-VN')}đ
+                                        </Text>
+                                    </View>
+                                )}
+
                                 <View style={styles.bookingInfo}>
                                     <Ionicons name="cash-outline" size={16} color="#4a90e2" />
                                     <Text style={styles.bookingPrice}>
@@ -1195,6 +1341,22 @@ export default function RentalScreen() {
                     setSelectedBooking(null);
                 }}
                 onSave={handleEditBooking}
+            />
+            <CheckoutPaymentModal
+                visible={showCheckoutPaymentModal}
+                booking={selectedBooking ? {
+                    id: selectedBooking.id!,
+                    roomNumber: selectedBooking.roomNumber,
+                    customerName: selectedBooking.customerName,
+                    totalAmount: selectedBooking.totalAmount,
+                    deposit: selectedBooking.deposit,
+                } : null}
+                remainingAmount={selectedBooking ? selectedBooking.totalAmount - selectedBooking.deposit : 0}
+                onClose={() => {
+                    setShowCheckoutPaymentModal(false);
+                    setSelectedBooking(null);
+                }}
+                onConfirm={handleCheckoutPaymentConfirm}
             />
         </View>
     );

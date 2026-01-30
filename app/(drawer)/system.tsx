@@ -48,6 +48,15 @@ export default function SystemScreen() {
             onPress: () => router.push('/services'),
         },
         {
+            id: 'add-promotion',
+            title: 'Khuyến mãi',
+            description: 'Quản lý mã giảm giá & ưu đãi',
+            icon: 'gift',
+            color: '#dc2626',
+            bgColor: '#fee2e2',
+            onPress: () => router.push('/promotions'),
+        },
+        {
             id: 'view-history',
             title: 'Lịch sử',
             description: 'Xem lịch sử hoạt động',

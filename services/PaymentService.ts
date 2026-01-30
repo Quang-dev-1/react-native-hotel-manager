@@ -9,6 +9,14 @@ export interface CreateDepositPaymentRequest {
     expiredAt?: number;
 }
 
+export interface CreateCheckoutPaymentRequest {
+    bookingId: number;
+    remainingAmount: number;
+    returnUrl?: string;
+    cancelUrl?: string;
+    expiredAt?: number;
+}
+
 export interface PaymentResponse {
     success: boolean;
     paymentUrl: string;
@@ -21,6 +29,7 @@ export interface VerifyPaymentResponse {
     success: boolean;
     bookingId: number;
     orderCode: number;
+    paymentType: 'DEPOSIT' | 'CHECKOUT';
     isPaid: boolean;
     paidAmount: number;
     totalAmount: number;
@@ -46,14 +55,34 @@ export class PaymentService {
 
             const response = await apiClient.post('/payment/create-deposit', request);
 
-            console.log('✅ Payment created successfully:', response.data);
+            console.log('✅ Deposit payment created successfully:', response.data);
             return response.data;
         } catch (error: any) {
-            console.error('❌ Create payment error:', error.response?.data || error.message);
+            console.error('❌ Create deposit payment error:', error.response?.data || error.message);
             throw new Error(
                 error.response?.data?.error ||
                 error.response?.data?.message ||
-                'Không thể tạo thanh toán. Vui lòng thử lại.'
+                'Không thể tạo thanh toán cọc. Vui lòng thử lại.'
+            );
+        }
+    }
+
+    static async createCheckoutPayment(
+        request: CreateCheckoutPaymentRequest
+    ): Promise<PaymentResponse> {
+        try {
+            console.log('💳 Creating checkout payment:', request);
+
+            const response = await apiClient.post('/payment/create-checkout', request);
+
+            console.log('✅ Checkout payment created successfully:', response.data);
+            return response.data;
+        } catch (error: any) {
+            console.error('❌ Create checkout payment error:', error.response?.data || error.message);
+            throw new Error(
+                error.response?.data?.error ||
+                error.response?.data?.message ||
+                'Không thể tạo thanh toán checkout. Vui lòng thử lại.'
             );
         }
     }
@@ -95,8 +124,10 @@ export class PaymentService {
     }
 
     static parsePaymentInfo(notes: string): {
-        orderCode: string | null;
+        depositOrderCode: string | null;
+        checkoutOrderCode: string | null;
         transactions: {
+            type: 'DEPOSIT' | 'CHECKOUT';
             orderCode: string;
             transactionId: string;
             amount: string;
@@ -105,8 +136,10 @@ export class PaymentService {
         }[];
     } {
         const result = {
-            orderCode: null as string | null,
+            depositOrderCode: null as string | null,
+            checkoutOrderCode: null as string | null,
             transactions: [] as {
+                type: 'DEPOSIT' | 'CHECKOUT';
                 orderCode: string;
                 transactionId: string;
                 amount: string;
@@ -117,16 +150,22 @@ export class PaymentService {
 
         if (!notes) return result;
 
-        const orderCodeMatch = notes.match(/\[PAYOS_ORDER_CODE:(\d+)\]/);
-        if (orderCodeMatch) {
-            result.orderCode = orderCodeMatch[1];
+        const depositOrderCodeMatch = notes.match(/\[PAYOS_ORDER_CODE:(\d+)\]/);
+        if (depositOrderCodeMatch) {
+            result.depositOrderCode = depositOrderCodeMatch[1];
         }
 
-        const successMatches = notes.matchAll(
+        const checkoutOrderCodeMatch = notes.match(/\[PAYOS_CHECKOUT_ORDER_CODE:(\d+)\]/);
+        if (checkoutOrderCodeMatch) {
+            result.checkoutOrderCode = checkoutOrderCodeMatch[1];
+        }
+
+        const depositSuccessMatches = notes.matchAll(
             /\[PAYMENT_SUCCESS:\s*(\d+)\s*\|\s*TxID:\s*([^\|]+)\s*\|\s*Amount:\s*(\d+)\s*\|\s*Time:\s*([^\]]+)\]/g
         );
-        for (const match of successMatches) {
+        for (const match of depositSuccessMatches) {
             result.transactions.push({
+                type: 'DEPOSIT',
                 orderCode: match[1],
                 transactionId: match[2].trim(),
                 amount: match[3],
@@ -135,11 +174,40 @@ export class PaymentService {
             });
         }
 
-        const cancelMatches = notes.matchAll(
+        const checkoutSuccessMatches = notes.matchAll(
+            /\[CHECKOUT_PAYMENT_SUCCESS:\s*(\d+)\s*\|\s*TxID:\s*([^\|]+)\s*\|\s*Amount:\s*(\d+)\s*\|\s*Time:\s*([^\]]+)\]/g
+        );
+        for (const match of checkoutSuccessMatches) {
+            result.transactions.push({
+                type: 'CHECKOUT',
+                orderCode: match[1],
+                transactionId: match[2].trim(),
+                amount: match[3],
+                time: match[4].trim(),
+                status: 'success',
+            });
+        }
+
+        const depositCancelMatches = notes.matchAll(
             /\[PAYMENT_CANCELLED:\s*(\d+)\s*\|\s*Time:\s*([^\]]+)\]/g
         );
-        for (const match of cancelMatches) {
+        for (const match of depositCancelMatches) {
             result.transactions.push({
+                type: 'DEPOSIT',
+                orderCode: match[1],
+                transactionId: '',
+                amount: '0',
+                time: match[2].trim(),
+                status: 'cancelled',
+            });
+        }
+
+        const checkoutCancelMatches = notes.matchAll(
+            /\[CHECKOUT_PAYMENT_CANCELLED:\s*(\d+)\s*\|\s*Time:\s*([^\]]+)\]/g
+        );
+        for (const match of checkoutCancelMatches) {
+            result.transactions.push({
+                type: 'CHECKOUT',
                 orderCode: match[1],
                 transactionId: '',
                 amount: '0',
@@ -167,6 +235,7 @@ export class PaymentService {
 
 
 export const createDepositPayment = PaymentService.createDepositPayment;
+export const createCheckoutPayment = PaymentService.createCheckoutPayment;
 export const verifyPayment = PaymentService.verifyPayment;
 export const getPaymentHistory = PaymentService.getPaymentHistory;
 export const parsePaymentInfo = PaymentService.parsePaymentInfo;

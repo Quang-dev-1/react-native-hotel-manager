@@ -98,7 +98,6 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
 
-      // Gửi fullName thay vì name để khớp với backend
       await authService.register({
         fullName: name.trim(),
         email: email.trim(),
@@ -133,6 +132,15 @@ export default function RegisterScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
+
+      {/* ✅ NÚT BACK Ở GÓC TRÊN TRÁI */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.back()}
+        disabled={loading}>
+        <Ionicons name="arrow-back" size={24} color="#1f2035ff" />
+      </TouchableOpacity>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}>
@@ -147,10 +155,11 @@ export default function RegisterScreen() {
               source={require('../../assets/images/HotelManager.png')}
             />
             <Text style={styles.title}>Tạo Tài Khoản</Text>
-            <Text style={styles.subtitle}>Tham gia cùng chúng tôi để bắt đầu mua sắm</Text>
+            <Text style={styles.subtitle}>Tham gia cùng chúng tôi để bắt đầu</Text>
           </View>
 
           <View style={styles.form}>
+            {/* NAME INPUT */}
             <View>
               <View style={[styles.input, nameError && styles.inputError]}>
                 <Ionicons name="person" size={20} color="#1f2035ff" />
@@ -175,6 +184,7 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
+            {/* EMAIL INPUT */}
             <View>
               <View style={[styles.input, emailError && styles.inputError]}>
                 <Ionicons name="mail" size={20} color="#1f2035ff" />
@@ -200,6 +210,7 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
+            {/* PHONE INPUT */}
             <View>
               <View style={[styles.input, phoneError && styles.inputError]}>
                 <Ionicons name="call" size={20} color="#1f2035ff" />
@@ -224,6 +235,7 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
+            {/* PASSWORD INPUT */}
             <View>
               <View style={[styles.input, passwordError && styles.inputError]}>
                 <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
@@ -252,6 +264,7 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
+            {/* CONFIRM PASSWORD INPUT */}
             <View>
               <View style={[styles.input, confirmPasswordError && styles.inputError]}>
                 <Ionicons name="lock-closed" size={20} color="#1f2035ff" />
@@ -280,6 +293,7 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
+            {/* TERMS CHECKBOX */}
             <View>
               <TouchableOpacity
                 style={styles.terms}
@@ -303,6 +317,7 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
+            {/* REGISTER BUTTON */}
             <TouchableOpacity
               onPress={handleRegister}
               style={styles.btnWrap}
@@ -319,12 +334,14 @@ export default function RegisterScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
+            {/* DIVIDER */}
             <View style={styles.divider}>
               <View style={styles.line} />
               <Text style={styles.dividerTxt}>HOẶC</Text>
               <View style={styles.line} />
             </View>
 
+            {/* SOCIAL LOGIN BUTTONS */}
             <View style={styles.social}>
               <TouchableOpacity style={styles.socialBtn} disabled={loading}>
                 <Ionicons name="logo-google" size={22} color="#DB4437" />
@@ -337,10 +354,11 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* ✅ SIGN IN LINK - Đã có sẵn */}
             <View style={styles.signin}>
               <Text style={styles.signinTxt}>Đã có tài khoản? </Text>
               <TouchableOpacity
-                onPress={() => router.back()}
+                onPress={() => router.push('/(auth)/login')}
                 disabled={loading}>
                 <Text style={styles.signinLink}>Đăng Nhập</Text>
               </TouchableOpacity>
@@ -356,6 +374,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  // ✅ STYLE CHO NÚT BACK
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f9fafb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   flex: {
     flex: 1,
@@ -404,6 +443,7 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: '#ef4444',
     borderWidth: 2,
+    backgroundColor: '#fef2f2',
   },
   textInput: {
     flex: 1,
@@ -421,7 +461,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 13,
     color: '#ef4444',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   terms: {
     flexDirection: 'row',

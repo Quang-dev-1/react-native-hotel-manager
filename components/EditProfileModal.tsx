@@ -100,9 +100,6 @@ export default function EditProfileModal({ visible, user, onClose, onSuccess }: 
                                 <Ionicons name="person" size={60} color="#fff" />
                             </View>
                             <Text style={styles.emailText}>{user?.email}</Text>
-                            <View style={styles.roleBadge}>
-                                <Text style={styles.roleText}>{user?.role || 'USER'}</Text>
-                            </View>
                         </View>
 
                         <View style={styles.formSection}>

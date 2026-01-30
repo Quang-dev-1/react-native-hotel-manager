@@ -84,7 +84,7 @@ export default function FinanceScreen() {
                 description: t.description,
                 date: financeService.formatDateForDisplay(t.transactionDate),
                 paymentMethod: t.paymentMethod.toLowerCase()
-            }));
+            })).reverse(); // <--- CHỈ THÊM .reverse() TẠI ĐÂY ĐỂ ĐẢO NGƯỢC THỨ TỰ
 
             setTransactions(displayTransactions);
             setSummary(summaryData);
@@ -95,7 +95,6 @@ export default function FinanceScreen() {
             setLoading(false);
         }
     };
-
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await loadData();
@@ -170,6 +169,7 @@ export default function FinanceScreen() {
         const categories: Record<string, { label: string; icon: string; color: string }> = {
             room_rental: { label: 'Tiền phòng', icon: 'bed', color: '#4a90e2' },
             service: { label: 'Dịch vụ', icon: 'restaurant', color: '#8b5cf6' },
+            discount: { label: 'Giảm giá/KM', icon: 'pricetag', color: '#22c55e' }, // ✅ THÊM
             supplies: { label: 'Vật tư', icon: 'cube', color: '#f59e0b' },
             salary: { label: 'Lương', icon: 'people', color: '#ef4444' },
             utilities: { label: 'Tiện ích', icon: 'flash', color: '#06b6d4' },

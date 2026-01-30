@@ -14,15 +14,18 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import BookingFormScreen from '../(drawer)/BookingFormScreen';
-import BookingsScreen from '../(drawer)/bookings';
 import DashboardScreen from '../(drawer)/dashboard';
 import ProfileScreen from '../(drawer)/profile';
 import RentalScreen from '../(drawer)/rental';
+import BookingFormScreen from './BookingFormScreen';
+
+import BookingsScreen from './bookings';
+import CheckoutPaymentScreen from './CheckoutPaymentScreen';
 import FinanceScreen from './finance';
 import InvoiceScreen from './invoice';
 import LogsScreen from './logs';
 import PaymentScreen from './PaymentScreen';
+import PromotionsScreen from './promotions';
 import RecentHistoryScreen from './RecentHistoryScreen';
 import RoomTypesScreen from './room-types';
 import RoomsScreen from './rooms';
@@ -196,7 +199,9 @@ export default function DrawerLayout() {
           <Drawer.Screen name="services" component={ServicesScreen} />
           <Drawer.Screen name="rooms" component={RoomsScreen} />
           <Drawer.Screen name="room-types" component={RoomTypesScreen} />
+          <Drawer.Screen name="promotions" component={PromotionsScreen} />
           <Drawer.Screen name="PaymentScreen" component={PaymentScreen} />
+          <Drawer.Screen name="CheckoutPaymentScreen" component={CheckoutPaymentScreen} />
           <Drawer.Screen name="inventory" component={InvoiceScreen} />
           <Drawer.Screen name="statistics" component={StatisticsScreen} />
           <Drawer.Screen name="settings" component={SettingsScreen} />

@@ -619,4 +619,24 @@ export const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    promotionInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#faf5ff',
+        padding: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e9d5ff',
+    },
+    promotionCodeText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#7c3aed',
+    },
+    promotionNameText: {
+        fontSize: 12,
+        color: '#8b5cf6',
+        marginTop: 2,
+    },
 });

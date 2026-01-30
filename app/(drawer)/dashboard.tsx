@@ -1,5 +1,6 @@
 import BookingService, { DashboardStats } from '@/services/bookingService';
 import financeService, { FinanceSummary } from '@/services/financeService';
+import roomService from '@/services/roomService';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -42,8 +43,56 @@ export default function DashboardScreen() {
     const loadDashboardStats = async () => {
         try {
             console.log('📊 Loading dashboard stats...');
-            const data = await BookingService.getDashboardStats();
-            setStats(data);
+
+            // Lấy tất cả bookings và rooms
+            const allBookings = await BookingService.getAllBookings();
+            const allRooms = await roomService.getRooms();
+
+            // Đếm đúng từ bookings thay vì tin backend
+            const today = new Date().toISOString().split('T')[0];
+
+            // 1. Thuê trong ngày (bookings tạo hôm nay)
+            const todayRentals = allBookings.filter(b => {
+                if (!b.createdAt) return false;
+                const createdDate = new Date(b.createdAt).toISOString().split('T')[0];
+                return createdDate === today;
+            }).length;
+
+            // 2. Phòng chờ xác nhận (PENDING + CONFIRMED)
+            const waitingRooms = allBookings.filter(b =>
+                b.status === 'PENDING' || b.status === 'CONFIRMED'
+            ).length;
+
+            // 3. Phòng đang thuê (CHECKED_IN)
+            const occupiedRooms = allBookings.filter(b =>
+                b.status === 'CHECKED_IN'
+            ).length;
+
+            // 4. Phòng cần dọn (CHECKED_OUT)
+            const cleaningRooms = allBookings.filter(b =>
+                b.status === 'CHECKED_OUT'
+            ).length;
+
+            // 5. Tổng số phòng
+            const totalRooms = allRooms.length;
+
+            // 6. Phòng trống (status = AVAILABLE)
+            const availableRooms = allRooms.filter(r =>
+                r.status === 'AVAILABLE'
+            ).length;
+
+            const correctedStats = {
+                todayRentals,
+                occupiedRooms,
+                waitingRooms,
+                cleaningRooms,
+                totalRooms,
+                availableRooms,
+            };
+
+            console.log('✅ Corrected stats:', correctedStats);
+            setStats(correctedStats);
+
             const summary = await financeService.getFinanceSummary('month');
             setFinanceSummary(summary);
 
@@ -148,7 +197,7 @@ export default function DashboardScreen() {
         },
         {
             icon: 'time-outline',
-            label: 'Phòng chờ',
+            label: 'Phòng chờ xác nhận',
             value: stats.waitingRooms,
             color: ['#fde68a', '#f59e0b'],
             bgColor: '#fef3c7',

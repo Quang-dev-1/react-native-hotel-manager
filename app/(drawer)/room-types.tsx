@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AddRoomTypeModal from '../../components/AddRoomTypeModal';
+import EditRoomTypeModal from '../../components/EditRoomTypeModal';
 import roomService, { RoomType } from '../../services/roomService';
 
 export default function RoomTypesScreen() {
@@ -11,6 +12,8 @@ export default function RoomTypesScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [selectedRoomType, setSelectedRoomType] = useState<RoomType | null>(null);
 
     const fetchRoomTypes = useCallback(async (isRefreshing = false) => {
         try {
@@ -33,6 +36,11 @@ export default function RoomTypesScreen() {
     const onRefresh = () => {
         setRefreshing(true);
         fetchRoomTypes(true);
+    };
+
+    const handleEdit = (roomType: RoomType) => {
+        setSelectedRoomType(roomType);
+        setShowEditModal(true);
     };
 
     const handleDelete = (id: number) => {
@@ -81,9 +89,14 @@ export default function RoomTypesScreen() {
                     </View>
                 )}
             </View>
-            <TouchableOpacity onPress={() => handleDelete(item.id!)} style={styles.deleteButton}>
-                <Ionicons name="trash-outline" size={20} color="#ef4444" />
-            </TouchableOpacity>
+            <View style={styles.actionButtons}>
+                <TouchableOpacity onPress={() => handleEdit(item)} style={styles.editButton}>
+                    <Ionicons name="create-outline" size={20} color="#8b5cf6" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDelete(item.id!)} style={styles.deleteButton}>
+                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                </TouchableOpacity>
+            </View>
         </View>
     );
 
@@ -115,6 +128,16 @@ export default function RoomTypesScreen() {
             <AddRoomTypeModal
                 visible={showAddModal}
                 onClose={() => setShowAddModal(false)}
+                onSuccess={() => fetchRoomTypes()}
+            />
+
+            <EditRoomTypeModal
+                visible={showEditModal}
+                roomType={selectedRoomType}
+                onClose={() => {
+                    setShowEditModal(false);
+                    setSelectedRoomType(null);
+                }}
                 onSuccess={() => fetchRoomTypes()}
             />
         </View>
@@ -210,9 +233,15 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         flex: 1
     },
+    actionButtons: {
+        justifyContent: 'center',
+        gap: 8
+    },
+    editButton: {
+        padding: 8
+    },
     deleteButton: {
-        padding: 8,
-        justifyContent: 'center'
+        padding: 8
     },
     emptyText: {
         textAlign: 'center',

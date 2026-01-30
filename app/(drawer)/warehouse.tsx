@@ -23,7 +23,7 @@ export default function WarehouseScreen() {
     const [inventory, setInventory] = useState<Inventory[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-const [showSuppliesOnly, setShowSuppliesOnly] = useState(false);
+    const [showSuppliesOnly, setShowSuppliesOnly] = useState(false);
     const categories = [
         { key: 'all', label: 'Tất cả', icon: 'grid-outline' },
         { key: 'textile', label: 'Vải dệt', icon: 'shirt-outline' },
