@@ -17,8 +17,8 @@ import {
 import DashboardScreen from '../(drawer)/dashboard';
 import ProfileScreen from '../(drawer)/profile';
 import RentalScreen from '../(drawer)/rental';
+import AIChatbotScreen from './ai-chatbot';
 import BookingFormScreen from './BookingFormScreen';
-
 import BookingsScreen from './bookings';
 import CheckoutPaymentScreen from './CheckoutPaymentScreen';
 import FinanceScreen from './finance';
@@ -95,6 +95,12 @@ function CustomDrawerContent() {
       icon: 'repeat-outline',
       screen: 'rental',
       component: RentalScreen,
+    },
+    {
+      name: 'AI Trợ lý',
+      icon: 'chatbubbles-outline',
+      screen: 'ai-chatbot',
+      component: AIChatbotScreen,
     },
     {
       name: 'Quản lý kho',
@@ -191,6 +197,7 @@ export default function DrawerLayout() {
           <Drawer.Screen name="bookings" component={BookingsScreen} />
           <Drawer.Screen name="rental" component={RentalScreen} />
           <Drawer.Screen name="BookingFormScreen" component={BookingFormScreen} />
+          <Drawer.Screen name="ai-chatbot" component={AIChatbotScreen} />
           <Drawer.Screen name="profile" component={ProfileScreen} />
           <Drawer.Screen name="warehouse" component={WarehouseScreen} />
           <Drawer.Screen name="finance" component={FinanceScreen} />

@@ -33,6 +33,7 @@ export default function FinanceScreen() {
     const navigation = useNavigation();
     const [selectedPeriod, setSelectedPeriod] = useState('month');
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showFilterModal, setShowFilterModal] = useState(false);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showSuppliesOnly, setShowSuppliesOnly] = useState(false);
@@ -54,15 +55,25 @@ export default function FinanceScreen() {
     });
 
     const periods = [
+        { key: 'yesterday', label: 'Hôm qua' },
         { key: 'day', label: 'Hôm nay' },
+        { key: 'last_week', label: 'Tuần trước' },
         { key: 'week', label: 'Tuần này' },
+        { key: 'last_month', label: 'Tháng trước' },
         { key: 'month', label: 'Tháng này' },
+        { key: 'last_year', label: 'Năm trước' },
         { key: 'year', label: 'Năm này' },
-
     ];
+
     const displayedTransactions = showSuppliesOnly
         ? transactions.filter(t => t.category === 'supplies' && t.type === 'expense')
         : transactions;
+
+    const getSelectedPeriodLabel = () => {
+        const period = periods.find(p => p.key === selectedPeriod);
+        return period ? period.label : 'Chọn khoảng thời gian';
+    };
+
     useEffect(() => {
         loadData();
     }, [selectedPeriod]);
@@ -84,7 +95,7 @@ export default function FinanceScreen() {
                 description: t.description,
                 date: financeService.formatDateForDisplay(t.transactionDate),
                 paymentMethod: t.paymentMethod.toLowerCase()
-            })).reverse(); // <--- CHỈ THÊM .reverse() TẠI ĐÂY ĐỂ ĐẢO NGƯỢC THỨ TỰ
+            })).reverse();
 
             setTransactions(displayTransactions);
             setSummary(summaryData);
@@ -95,6 +106,7 @@ export default function FinanceScreen() {
             setLoading(false);
         }
     };
+
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await loadData();
@@ -169,7 +181,7 @@ export default function FinanceScreen() {
         const categories: Record<string, { label: string; icon: string; color: string }> = {
             room_rental: { label: 'Tiền phòng', icon: 'bed', color: '#4a90e2' },
             service: { label: 'Dịch vụ', icon: 'restaurant', color: '#8b5cf6' },
-            discount: { label: 'Giảm giá/KM', icon: 'pricetag', color: '#22c55e' }, // ✅ THÊM
+            discount: { label: 'Giảm giá/KM', icon: 'pricetag', color: '#22c55e' },
             supplies: { label: 'Vật tư', icon: 'cube', color: '#f59e0b' },
             salary: { label: 'Lương', icon: 'people', color: '#ef4444' },
             utilities: { label: 'Tiện ích', icon: 'flash', color: '#06b6d4' },
@@ -232,26 +244,17 @@ export default function FinanceScreen() {
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }>
-                {/* Period Filter */}
+                {/* Filter Button */}
                 <View style={styles.periodFilter}>
-                    {periods.map((period) => (
-                        <TouchableOpacity
-                            key={period.key}
-                            style={[
-                                styles.periodButton,
-                                selectedPeriod === period.key && styles.periodButtonActive,
-                            ]}
-                            onPress={() => setSelectedPeriod(period.key)}>
-                            <Text
-                                style={[
-                                    styles.periodText,
-                                    selectedPeriod === period.key && styles.periodTextActive,
-                                ]}>
-                                {period.label}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                    <TouchableOpacity
+                        style={styles.periodFilterButton}
+                        onPress={() => setShowFilterModal(true)}>
+                        <Ionicons name="calendar-outline" size={20} color="#4a90e2" />
+                        <Text style={styles.periodFilterText}>{getSelectedPeriodLabel()}</Text>
+                        <Ionicons name="chevron-down" size={20} color="#4a90e2" />
+                    </TouchableOpacity>
                 </View>
+
                 <View style={styles.filterSection}>
                     <TouchableOpacity
                         style={[
@@ -406,6 +409,50 @@ export default function FinanceScreen() {
                 </View>
             </ScrollView>
 
+            {/* Filter Modal */}
+            <Modal
+                visible={showFilterModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowFilterModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.filterModalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Chọn khoảng thời gian</Text>
+                            <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                                <Ionicons name="close" size={28} color="#64748b" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {periods.map((period) => (
+                                <TouchableOpacity
+                                    key={period.key}
+                                    style={[
+                                        styles.filterOption,
+                                        selectedPeriod === period.key && styles.filterOptionActive
+                                    ]}
+                                    onPress={() => {
+                                        setSelectedPeriod(period.key);
+                                        setShowFilterModal(false);
+                                    }}>
+                                    <Text style={[
+                                        styles.filterOptionText,
+                                        selectedPeriod === period.key && styles.filterOptionTextActive
+                                    ]}>
+                                        {period.label}
+                                    </Text>
+                                    {selectedPeriod === period.key && (
+                                        <Ionicons name="checkmark-circle" size={24} color="#4a90e2" />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Add Transaction Modal */}
             <Modal
                 visible={showAddModal}
                 animationType="slide"
@@ -571,30 +618,29 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     periodFilter: {
-        flexDirection: 'row',
         padding: 16,
-        gap: 8,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#e2e8f0',
     },
-    periodButton: {
-        flex: 1,
-        paddingVertical: 8,
-        borderRadius: 8,
-        backgroundColor: '#f8fafc',
+    periodFilterButton: {
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        backgroundColor: '#f8fafc',
+        borderWidth: 2,
+        borderColor: '#4a90e2',
     },
-    periodButtonActive: {
-        backgroundColor: '#4a90e2',
-    },
-    periodText: {
-        fontSize: 13,
+    periodFilterText: {
+        fontSize: 15,
         fontWeight: '600',
-        color: '#64748b',
-    },
-    periodTextActive: {
-        color: '#fff',
+        color: '#4a90e2',
+        flex: 1,
+        textAlign: 'center',
     },
     summarySection: {
         padding: 16,
@@ -753,6 +799,15 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
         maxHeight: '90%',
     },
+    filterModalContent: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 40,
+        maxHeight: '70%',
+    },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -763,6 +818,31 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '700',
         color: '#1e293b',
+    },
+    filterOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        backgroundColor: '#f8fafc',
+        marginBottom: 8,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    filterOptionActive: {
+        backgroundColor: '#dbeafe',
+        borderColor: '#4a90e2',
+    },
+    filterOptionText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#64748b',
+    },
+    filterOptionTextActive: {
+        color: '#4a90e2',
+        fontWeight: '700',
     },
     inputLabel: {
         fontSize: 14,

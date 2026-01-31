@@ -51,7 +51,6 @@ export default function LoginScreen() {
         setRememberMe(true);
       }
     } catch (error) {
-      console.error('Error loading saved credentials:', error);
     }
   };
 
@@ -69,7 +68,6 @@ export default function LoginScreen() {
         ]);
       }
     } catch (error) {
-      console.error('Error saving credentials:', error);
     }
   };
 
@@ -111,20 +109,9 @@ export default function LoginScreen() {
 
       router.replace('/(drawer)/dashboard');
     } catch (error: any) {
-      console.error('Login error:', error);
-
-      // Xử lý lỗi chi tiết
-      const errorMessage = error.message || '';
-
-      if (errorMessage.includes('email') || errorMessage.includes('Email')) {
-        setEmailError('Email không tồn tại trong hệ thống');
-      } else if (errorMessage.includes('password') || errorMessage.includes('Password') || errorMessage.includes('Invalid')) {
-        setPasswordError('Mật khẩu không chính xác');
-      } else {
-        // Lỗi chung
-        setEmailError(errorMessage || 'Đăng nhập thất bại');
-        setPasswordError(errorMessage || 'Vui lòng kiểm tra lại thông tin');
-      }
+      // Hiển thị thông báo lỗi tiếng Việt chung, không hiển thị chi tiết lỗi kỹ thuật
+      setEmailError('Tài khoản hoặc mật khẩu không chính xác');
+      setPasswordError('Vui lòng kiểm tra lại thông tin đăng nhập');
     } finally {
       setLoading(false);
     }
@@ -142,7 +129,6 @@ export default function LoginScreen() {
           STORAGE_KEYS.SAVED_PASSWORD,
         ]);
       } catch (error) {
-        console.error('Error removing saved credentials:', error);
       }
     }
   };

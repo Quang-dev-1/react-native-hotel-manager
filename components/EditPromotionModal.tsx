@@ -574,7 +574,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     inputLabel: {
-
     },
     header: {
         flexDirection: 'row',

@@ -283,8 +283,8 @@ export default function BookingsScreen() {
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
-    // ===== THÊM STATE CHO THÁNG =====
-    const [selectedMonth, setSelectedMonth] = useState(0); // 0 = tháng hiện tại, 1 = tháng sau, 2 = tháng sau nữa
+    // ===== THÊM STATE CHO THÁNG - HỖ TRỢ 12 THÁNG =====
+    const [selectedMonth, setSelectedMonth] = useState(0); // 0 = tháng hiện tại, 1-11 = các tháng tiếp theo
 
     // ===== HÀM TẠO DANH SÁCH NGÀY THEO THÁNG ĐƯỢC CHỌN =====
     const getDaysForMonth = (monthOffset: number) => {
@@ -308,7 +308,7 @@ export default function BookingsScreen() {
 
         while (currentDate <= lastDayOfMonth) {
             days.push({
-                date: currentDate.toLocaleDateString('en-CA'), // YYYY-MM-DD
+                date: currentDate.toLocaleDateString('en-CA'),
                 display: `${currentDate.getDate()}/${currentDate.getMonth() + 1}`,
             });
             currentDate.setDate(currentDate.getDate() + 1);
@@ -317,24 +317,21 @@ export default function BookingsScreen() {
         return days;
     };
 
-    // ===== CẬP NHẬT DATES KHI CHỌN THÁNG =====
     const [dates, setDates] = useState(getDaysForMonth(0));
 
-    // Khi selectedMonth thay đổi, cập nhật lại dates
     const handleMonthChange = (monthOffset: number) => {
         setSelectedMonth(monthOffset);
         setDates(getDaysForMonth(monthOffset));
     };
 
-    // ===== HÀM LẤY TÊN THÁNG =====
     const getMonthName = (monthOffset: number) => {
         const today = new Date();
         const targetDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
         const monthNames = [
-            'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
-            'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+            'T1', 'T2', 'T3', 'T4', 'T5', 'T6',
+            'T7', 'T8', 'T9', 'T10', 'T11', 'T12'
         ];
-        return `${monthNames[targetDate.getMonth()]} ${targetDate.getFullYear()}`;
+        return `${monthNames[targetDate.getMonth()]}/${targetDate.getFullYear()}`;
     };
 
     const fetchData = async () => {
@@ -565,113 +562,128 @@ export default function BookingsScreen() {
                     <Text style={styles.headerTitle}>Lịch đặt phòng</Text>
                 </View>
 
-                {/* ===== THÊM MONTH SELECTOR ===== */}
-                <View style={styles.monthSelector}>
-                    <TouchableOpacity
-                        style={[styles.monthButton, selectedMonth === 0 && styles.monthButtonActive]}
-                        onPress={() => handleMonthChange(0)}>
-                        <Text style={[styles.monthButtonText, selectedMonth === 0 && styles.monthButtonTextActive]}>
-                            {getMonthName(0)}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.monthButton, selectedMonth === 1 && styles.monthButtonActive]}
-                        onPress={() => handleMonthChange(1)}>
-                        <Text style={[styles.monthButtonText, selectedMonth === 1 && styles.monthButtonTextActive]}>
-                            {getMonthName(1)}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.monthButton, selectedMonth === 2 && styles.monthButtonActive]}
-                        onPress={() => handleMonthChange(2)}>
-                        <Text style={[styles.monthButtonText, selectedMonth === 2 && styles.monthButtonTextActive]}>
-                            {getMonthName(2)}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                {/* ===== MONTH SELECTOR CHO CẢ NĂM (12 THÁNG) ===== */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.monthSelectorScroll}
+                    contentContainerStyle={styles.monthSelector}>
+                    {[...Array(12)].map((_, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={[
+                                styles.monthButton,
+                                selectedMonth === index && styles.monthButtonActive
+                            ]}
+                            onPress={() => handleMonthChange(index)}>
+                            <Text style={[
+                                styles.monthButtonText,
+                                selectedMonth === index && styles.monthButtonTextActive
+                            ]}>
+                                {getMonthName(index)}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
             </LinearGradient>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.calendarContainer}>
-                    <View style={styles.mainGrid}>
-                        <View style={styles.fixedColumn}>
-                            <View style={styles.roomColumnHeader}>
-                                <Ionicons name="bed-outline" size={20} color="#64748b" />
-                                <Text style={styles.roomHeaderText}>Phòng</Text>
-                            </View>
-                            <View>
-                                {rooms.map((room) => (
-                                    <View key={room.id} style={styles.roomInfoCell}>
-                                        <Text style={styles.roomNumberText}>{room.roomNumber}</Text>
-                                        <Text style={styles.roomTypeSmall} numberOfLines={1}>{room.roomTypeName}</Text>
-                                    </View>
-                                ))}
-                            </View>
+            <View style={styles.calendarContainer}>
+                <View style={styles.calendarWrapper}>
+                    {/* Cột phòng cố định */}
+                    <View style={styles.fixedColumn}>
+                        <View style={styles.roomColumnHeader}>
+                            <Ionicons name="bed-outline" size={20} color="#fff" />
+                            <Text style={styles.roomHeaderText}>Phòng</Text>
                         </View>
-
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
-                            <View>
-                                <View style={styles.calendarHeader}>
-                                    {dates.map((day) => (
-                                        <View key={day.date} style={styles.dateColumn}>
-                                            <Text style={styles.dateText}>{day.display}</Text>
-                                        </View>
-                                    ))}
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            scrollEnabled={false}
+                            style={styles.roomListContainer}>
+                            {rooms.map((room) => (
+                                <View key={room.id} style={styles.roomInfoCell}>
+                                    <Text style={styles.roomNumberText}>{room.roomNumber}</Text>
+                                    <Text style={styles.roomTypeSmall} numberOfLines={1}>{room.roomTypeName}</Text>
                                 </View>
-
-                                <View>
-                                    {rooms.map((room) => (
-                                        <View key={room.id} style={styles.roomRow}>
-                                            {dates.map((day, index) => {
-                                                const roomBookings = getBookingsForRoomAndDate(room.id!, day.date);
-                                                const primaryBooking = roomBookings.find(b => b.status === 'CHECKED_IN') || roomBookings[0];
-
-                                                const nextDay = dates[index + 1];
-                                                const isContinuous = nextDay && primaryBooking &&
-                                                    getBookingsForRoomAndDate(room.id!, nextDay.date).some(b => b.id === primaryBooking.id);
-
-                                                return (
-                                                    <TouchableOpacity
-                                                        key={day.date}
-                                                        style={[
-                                                            styles.dateCell,
-                                                            primaryBooking && {
-                                                                backgroundColor: getBookingColor(primaryBooking),
-                                                                borderRightWidth: isContinuous ? 0 : 1,
-                                                                marginRight: isContinuous ? -0.5 : 0,
-                                                            },
-                                                        ]}
-                                                        onPress={() => handleCellPress(room, day.date)}
-                                                    >
-                                                        {primaryBooking && (!dates[index - 1] || !getBookingsForRoomAndDate(room.id!, dates[index - 1]?.date).some(b => b.id === primaryBooking.id)) ? (
-                                                            <View style={styles.bookingIndicatorWrapper}>
-                                                                <Ionicons name="person" size={12} color="#1e293b" opacity={0.5} />
-                                                                {roomBookings.length > 1 && (
-                                                                    <View style={styles.multiBookingBadge}>
-                                                                        <Text style={styles.multiBookingText}>{roomBookings.length}</Text>
-                                                                    </View>
-                                                                )}
-                                                            </View>
-                                                        ) : null}
-                                                    </TouchableOpacity>
-                                                );
-                                            })}
-                                        </View>
-                                    ))}
-                                </View>
-                            </View>
+                            ))}
                         </ScrollView>
                     </View>
 
-                    <View style={styles.legend}>
-                        <View style={styles.legendItem}><View style={[styles.legendBox, { backgroundColor: '#fef3c7' }]} /><Text style={styles.legendText}>Chờ</Text></View>
-                        <View style={styles.legendItem}><View style={[styles.legendBox, { backgroundColor: '#dbeafe' }]} /><Text style={styles.legendText}>Xác nhận</Text></View>
-                        <View style={styles.legendItem}><View style={[styles.legendBox, { backgroundColor: '#dcfce7' }]} /><Text style={styles.legendText}>Đang ở</Text></View>
+                    {/* Phần lịch cuộn ngang */}
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.calendarScrollView}>
+                        <View>
+                            {/* Header ngày */}
+                            <View style={styles.calendarHeader}>
+                                {dates.map((day) => (
+                                    <View key={day.date} style={styles.dateColumn}>
+                                        <Text style={styles.dateText}>{day.display}</Text>
+                                    </View>
+                                ))}
+                            </View>
+
+                            {/* Lưới booking */}
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                {rooms.map((room) => (
+                                    <View key={room.id} style={styles.roomRow}>
+                                        {dates.map((day, index) => {
+                                            const roomBookings = getBookingsForRoomAndDate(room.id!, day.date);
+                                            const primaryBooking = roomBookings.find(b => b.status === 'CHECKED_IN') || roomBookings[0];
+
+                                            const nextDay = dates[index + 1];
+                                            const isContinuous = nextDay && primaryBooking &&
+                                                getBookingsForRoomAndDate(room.id!, nextDay.date).some(b => b.id === primaryBooking.id);
+
+                                            return (
+                                                <TouchableOpacity
+                                                    key={day.date}
+                                                    style={[
+                                                        styles.dateCell,
+                                                        primaryBooking && {
+                                                            backgroundColor: getBookingColor(primaryBooking),
+                                                            borderRightWidth: isContinuous ? 0 : 1,
+                                                            marginRight: isContinuous ? -0.5 : 0,
+                                                        },
+                                                    ]}
+                                                    onPress={() => handleCellPress(room, day.date)}
+                                                >
+                                                    {primaryBooking && (!dates[index - 1] || !getBookingsForRoomAndDate(room.id!, dates[index - 1]?.date).some(b => b.id === primaryBooking.id)) ? (
+                                                        <View style={styles.bookingIndicatorWrapper}>
+                                                            <Ionicons name="person" size={14} color="#1e293b" opacity={0.6} />
+                                                            {roomBookings.length > 1 && (
+                                                                <View style={styles.multiBookingBadge}>
+                                                                    <Text style={styles.multiBookingText}>{roomBookings.length}</Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                    ) : null}
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    </ScrollView>
+                </View>
+
+                {/* Legend */}
+                <View style={styles.legend}>
+                    <View style={styles.legendItem}>
+                        <View style={[styles.legendBox, { backgroundColor: '#fef3c7' }]} />
+                        <Text style={styles.legendText}>Chờ xác nhận</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                        <View style={[styles.legendBox, { backgroundColor: '#dbeafe' }]} />
+                        <Text style={styles.legendText}>Đã xác nhận</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                        <View style={[styles.legendBox, { backgroundColor: '#dcfce7' }]} />
+                        <Text style={styles.legendText}>Đang ở</Text>
                     </View>
                 </View>
-            </ScrollView>
+            </View>
 
             <BookingDetailModal
                 visible={showDetailModal}
@@ -719,19 +731,21 @@ const styles = StyleSheet.create({
         color: '#fff',
         flex: 1,
     },
-    // ===== THÊM STYLES CHO MONTH SELECTOR =====
+    monthSelectorScroll: {
+        marginTop: 16,
+    },
     monthSelector: {
         flexDirection: 'row',
         gap: 8,
-        marginTop: 16,
+        paddingRight: 20,
     },
     monthButton: {
-        flex: 1,
         paddingVertical: 10,
-        paddingHorizontal: 12,
+        paddingHorizontal: 16,
         borderRadius: 10,
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
         alignItems: 'center',
+        minWidth: 80,
     },
     monthButtonActive: {
         backgroundColor: '#fff',
@@ -744,7 +758,6 @@ const styles = StyleSheet.create({
     monthButtonTextActive: {
         color: '#4a90e2',
     },
-    // ===== KẾT THÚC MONTH SELECTOR STYLES =====
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
@@ -760,65 +773,77 @@ const styles = StyleSheet.create({
     calendarContainer: {
         flex: 1,
         backgroundColor: '#fff',
-        marginTop: 10,
-        borderRadius: 12,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
-    mainGrid: {
+    calendarWrapper: {
         flexDirection: 'row',
         flex: 1,
     },
     fixedColumn: {
-        width: 85,
+        width: 100,
         backgroundColor: '#f8fafc',
         borderRightWidth: 2,
-        borderRightColor: '#cbd5e1',
+        borderRightColor: '#e2e8f0',
         zIndex: 10,
     },
     roomColumnHeader: {
-        height: 50,
+        height: 56,
         justifyContent: 'center',
         alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-        backgroundColor: '#f1f5f9',
+        backgroundColor: '#4a90e2',
+        borderBottomWidth: 2,
+        borderBottomColor: '#357abd',
+        gap: 4,
     },
     roomHeaderText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#64748b',
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#fff',
+        letterSpacing: 0.5,
+    },
+    roomListContainer: {
+        flex: 1,
     },
     roomInfoCell: {
-        height: 60,
+        height: 64,
         justifyContent: 'center',
-        paddingLeft: 10,
+        paddingHorizontal: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#e2e8f0',
+        backgroundColor: '#fff',
     },
     roomNumberText: {
-        fontSize: 15,
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontWeight: '700',
         color: '#1e293b',
+        marginBottom: 2,
     },
     roomTypeSmall: {
-        fontSize: 10,
-        color: '#94a3b8',
+        fontSize: 11,
+        color: '#64748b',
+        fontWeight: '500',
+    },
+    calendarScrollView: {
+        flex: 1,
     },
     calendarHeader: {
         flexDirection: 'row',
-        height: 50,
-        backgroundColor: '#f8fafc',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
+        height: 56,
+        backgroundColor: '#f1f5f9',
+        borderBottomWidth: 2,
+        borderBottomColor: '#cbd5e1',
     },
     dateColumn: {
-        width: 65,
+        width: 70,
         justifyContent: 'center',
         alignItems: 'center',
         borderRightWidth: 1,
-        borderRightColor: '#f1f5f9',
+        borderRightColor: '#e2e8f0',
     },
     dateText: {
         fontSize: 13,
@@ -827,58 +852,65 @@ const styles = StyleSheet.create({
     },
     roomRow: {
         flexDirection: 'row',
-        height: 60,
+        height: 64,
     },
     dateCell: {
-        width: 65,
-        height: 60,
+        width: 70,
+        height: 64,
         borderRightWidth: 1,
-        borderRightColor: '#f1f5f9',
+        borderRightColor: '#e2e8f0',
         borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
+        borderBottomColor: '#e2e8f0',
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#fff',
     },
     bookingIndicatorWrapper: {
         position: 'relative',
     },
     multiBookingBadge: {
         position: 'absolute',
-        top: -8,
-        right: -8,
+        top: -10,
+        right: -10,
         backgroundColor: '#ef4444',
-        borderRadius: 10,
-        width: 16,
-        height: 16,
+        borderRadius: 12,
+        width: 20,
+        height: 20,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#fff',
     },
     multiBookingText: {
         color: '#fff',
-        fontSize: 10,
-        fontWeight: 'bold',
+        fontSize: 11,
+        fontWeight: '700',
     },
     legend: {
         flexDirection: 'row',
-        padding: 12,
+        padding: 16,
         borderTopWidth: 1,
         borderTopColor: '#e2e8f0',
-        backgroundColor: '#fff',
-        justifyContent: 'space-around',
+        backgroundColor: '#f8fafc',
+        justifyContent: 'center',
+        gap: 20,
     },
     legendItem: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 8,
     },
     legendBox: {
-        width: 14,
-        height: 14,
-        borderRadius: 3,
-        marginRight: 6,
+        width: 16,
+        height: 16,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#cbd5e1',
     },
     legendText: {
-        fontSize: 12,
-        color: '#64748b',
+        fontSize: 13,
+        color: '#475569',
+        fontWeight: '500',
     },
     modalOverlay: {
         flex: 1,
